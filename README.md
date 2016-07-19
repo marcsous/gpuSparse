@@ -9,7 +9,7 @@ Uses int32 and single precision to save memory (Matlab uses int64 and double).
 ## Installation
 
 
-1. Save in a folder called @gpuSparse on the matlab path
+1. Save in a folder called @gpuSparse on the Matlab path
 
 2. Inside Matlab, cd to the private directory
 
