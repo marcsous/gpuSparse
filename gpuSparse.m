@@ -1,12 +1,10 @@
 classdef gpuSparse
-%
+%%
 % Sparse GPU array class (mex wrappers to cuSPARSE).
 % Arguments are the same as matlab's sparse function.
-%
 % Usage: A = gpuSparse(row,col,val,nrows,ncols,nzmax)
 %
-    %% properties
-
+%%
     properties (SetAccess=private, SetObservable=true)
 
         nrows @ int32 = int32(0); % number of rows
@@ -24,11 +22,10 @@ classdef gpuSparse
 
     end
     
-    %% methods
-    
+%%
     methods
         
-        % constructor: accepts 0, 2, 3, 5 or 6 arguments
+        % constructor: accepts 0, 1, 2, 3, 5 or 6 arguments
         function A = gpuSparse(row,col,val,nrows,ncols,nzmax)
 
             % check arguments
@@ -37,15 +34,15 @@ classdef gpuSparse
                 error('Wrong number of arguments.');
             end
 
-            % catch oddball arguments
+            % catch oddball first argument ("row" is the first argument)
             if ~isnumeric(row)
-                if isa(row, class(A)); A = row; return; end
-                error('Argument type %s not supported.',class(row));
+                if nargin==1 && isa(row,class(A)); A = row; return; end
+                error('row type %s not supported.',class(row));
             end
 
-            % convert scalar, vector or matrix to sparse format
+            % convert scalar, vector or matrix to gpuSparse format
             if nargin==1
-                [nrows ncols] = size(row);
+                [nrows ncols] = size(row); % "row" is the first argument
                 [row col val] = find(row); % not efficient: row unsorted
             end
 
@@ -54,67 +51,82 @@ classdef gpuSparse
                 nrows = row; ncols = col;
                 row = []; col = []; val = [];
             end
-
+            
             % check sizes
-            if numel(row)~=numel(val); error('row vector is wrong size.'); end
-            if numel(col)~=numel(val); error('col vector is wrong size.'); end
+            if numel(row)~=numel(val); error('row and val size mismatch.'); end
+            if numel(col)~=numel(val); error('col and val size mismatch.'); end
 
-            % convert to required format for cuSPARSE
-            A.val = gpuArray(single(val(:)));
-            A.col = gpuArray(int32(col(:)));
-            A.row = gpuArray(int32(row(:))); % COO format
+            % check indices are integer
+            validateattributes(row,{'numeric','gpuArray'},{'integer'},'','row');
+            validateattributes(col,{'numeric','gpuArray'},{'integer'},'','col');
 
             % rows must be sorted for COO to CSR conversion
-            if ~issorted(A.row)
-                [A.row k] = sort(A.row);
-                A.col = A.col(k);
-                A.val = A.val(k);
+            if ~issorted(row)
+                [row k] = sort(row);
+                col = col(k);
+                val = val(k);
             end
-            
-            % check bounds
-            if numel(A.row) > 0
-                if A.row(1)<1; error('row indices must be >0.'); end
-                A.nrows = gather(A.row(end));
-                if min(A.col)<1; error('col indices must be >0.'); end
-                A.ncols = gather(max(A.col));
+
+            % cast to required classes
+            val = single(val(:));
+            col = int32(col(:));
+            row = int32(row(:)); % COO format
+
+            % check lower bounds
+            if numel(row) > 0
+                if row(1)<1; error('All row indices must be greater than zero.'); end
+                if min(col)<1; error('All col indices must be greater than zero.'); end
+                A.nrows = gather(row(end));
+                A.ncols = gather(max(col));
             end
 
             % check and apply user-supplied sizes
-            if exist('nrows','var') && exist('ncols','var')
-                if nrows>=A.nrows
-                    A.nrows = int32(nrows);
-                else
-                    error('Maximum row index exceeds nrows.');
-                end
-                if ncols>=A.ncols
-                    A.ncols = int32(ncols);
-                else
-                    error('Maximum col index exceeds ncols.');
-                end
+            if exist('nrows','var')
+                nrows = gather(nrows);
+                validateattributes(nrows,{'numeric'},{'scalar','integer','>=',A.nrows},'','nrows');
+                A.nrows = int32(nrows);
+            end
+            if exist('ncols','var')
+                ncols = gather(ncols);
+                validateattributes(ncols,{'numeric'},{'scalar','integer','>=',A.ncols},'','ncols');
+                A.ncols = int32(ncols);
             end
 
-            % don't use nzmax except to check if size is feasible
-            if nargin > 5
-                info = gpuDevice();
-                factor = 1; % empirical factor - not tuned yet
-                Required = 4 * (2 * nzmax + A.nrows + 1) * factor / 1E9;
-                Available = info.AvailableMemory / 1E9;
-                
-                if Required > Available
-                    error('Memory required too high (%.1fGb versus %.1fGb)',Required,Available);
-                end
+			% check upper bounds
+			if A.nrows==intmax('int32')
+				error('Number of rows equals or exceeds int32 range (%i).',intmax('int32'))
+			end
+			if A.ncols==intmax('int32')
+				error('Number of columns equals or exceeds int32 range (%i).',intmax('int32'))
             end
 
+             % estimate memory required to create matrix
+            info = gpuDevice();
+            AvailableMemory = info.AvailableMemory / 1E9;
+            if nargin < 6
+                nzmax = numel(val);
+            else
+                nzmax = gather(nzmax);
+                validateattributes(nzmax,{'numeric'},{'scalar','integer'},'','nzmax');
+                nzmax = max(double(nzmax),numel(val));
+            end
+            RequiredMemory = 4*double(A.nrows+1)/1E9;
+            if ~isa(val,'gpuArray'); RequiredMemory = RequiredMemory+4*nzmax/1E9; end
+            if ~isa(col,'gpuArray'); RequiredMemory = RequiredMemory+4*nzmax/1E9; end
+            if RequiredMemory > AvailableMemory
+                error('Not enough memory (%.1fGb required, %.1fGb available).',RequiredMemory,AvailableMemory);
+            end
+            
             % finally convert from COO to CSR format
-            A.row = coo2csr(A.row,A.nrows);
-           
+            A.row = coo2csr(row,A.nrows);
+            A.col = gpuArray(col);
+            A.val = gpuArray(val);
+ 
         end
         
-        %% local functions
-        
-        % validation - reduces performance but is helpful for testing
+        % validation - helpful for testing
         function validate(A)
-            
+
             message = 'Validation failure. Check line for details.';
             
             % fast checks
@@ -133,7 +145,7 @@ classdef gpuSparse
             if numel(A.row) ~= A.nrows+1; error(message); end
             if A.transp<0 || A.transp>2; error(message); end
             if numel(A.row) > 0
-                if A.row(1) < 1; error(message); end
+                if A.row(1) ~= 1; error(message); end
                 if A.row(end) ~= numel(A.val)+1; error(message); end
             end
 
@@ -182,13 +194,16 @@ classdef gpuSparse
         % wrapper to csrgeam: C = a*A + b*B
         function C = geam(A,B,a,b)
             if ~isequal(class(A),class(B))
-                error('no method for adding %s and %s.',class(A),class(B))
+                error('No method for adding %s and %s.',class(A),class(B))
             end
             if ~isequal(size(A),size(B))
-                error('matrices must have same size.')
+                error('Matrices must be the same size.')
             end
-            validateattributes(a, {'numeric'}, {'real', 'finite'});
-            validateattributes(b, {'numeric'}, {'real', 'finite'});
+            if A.transp ~= 0 || A.transp ~= 0
+                error('Matrix lazy-transpose not supported. Use full_transpose.')
+            end
+            validateattributes(a,{'numeric'},{'real','scalar','finite'},'','a');
+            validateattributes(b,{'numeric'},{'real','scalar','finite'},'','b');
             [m n] = size(A);
             C = gpuSparse(m,n);
             [C.row C.col C.val] = csrgeam(A.row,A.col,A.val,m,n,B.row,B.col,B.val,a,b);
@@ -219,14 +234,15 @@ classdef gpuSparse
                 y = A;
                 y.val = y.val * x;
             elseif isvector(x)
-                if ~isreal(A)
-                    error('Complex A not supported at the moment.')
-                end
-                if isreal(x)
+                if isreal(A) == isreal(x)
                     y = csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.transp,x);
-                else
+                elseif isreal(A)
                     y = complex(csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.transp,real(x)), ...
                                 csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.transp,imag(x)));
+                else
+                    y = complex(csrmv(A.row,A.col,real(A.val),A.nrows,A.ncols,A.transp,x), ...
+                                csrmv(A.row,A.col,imag(A.val),A.nrows,A.ncols,A.transp,x));
+                    if A.transp == 2; y = conj(y); end
                 end
             elseif ismatrix(x)
                 if ~isreal(A)
@@ -236,7 +252,7 @@ classdef gpuSparse
                     y = csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.transp,x);
                 else
                     y = complex(csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.transp,real(x)), ...
-                        csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.transp,imag(x)));
+                                csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.transp,imag(x)));
                 end
             else
                 error('Argument x has too many dimensions.')
@@ -260,7 +276,7 @@ classdef gpuSparse
         % full transpose: A.'
         function A_t = full_transpose(A) 
             [m n] = size(A);
-            A_t = gpuSparse(n,m);
+            A_t = gpuSparse([],[],[],n,m,nnz(A));
             A_t.transp = int32(0);
 
             % cuSPARSE version uses a lot of memory
@@ -285,7 +301,7 @@ classdef gpuSparse
         % lazy transpose (flag): A.'
         function A_t = transpose(A) 
             A_t = A; % lazy copy
-            switch A2.transp
+            switch A.transp
                 case 0; A_t.transp = int32(1);
                 case 1; A_t.transp = int32(0);
                 case 2; A_t.transp = int32(0); A_t.val = conj(A_t.val);
@@ -317,9 +333,35 @@ classdef gpuSparse
             retval = numel(A.val);
         end
         
+        % remove zeros from sparse matrix
+        function A = remove_zeros(A,threshold)
+            nonzeros = (A.val ~= 0);
+            if nargin<2; threshold = 0.9; end
+            if sum(nonzeros) < threshold * numel(A.val)
+                A.row = csr2coo(A.row,A.nrows);
+                A.row = coo2csr(A.row(nonzeros),A.nrows);
+                A.col = A.col(nonzeros);
+                A.val = A.val(nonzeros);
+            end
+        end
+
         % overload classUnderlying
         function str = classUnderlying(A)
             str = classUnderlying(A.val);
+        end
+        
+        % overload real
+        function B = real(A);
+            B = A;
+            B.val = real(A.val);
+            B = remove_zeros(B);
+        end
+        
+        % overload imag
+        function B = imag(A);
+            B = A;
+            B.val = imag(A.val);
+            B = remove_zeros(B);
         end
         
         % overload find: not efficient, just for debugging
