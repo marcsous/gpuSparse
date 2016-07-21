@@ -199,13 +199,22 @@ classdef gpuSparse
             if ~isequal(size(A),size(B))
                 error('Matrices must be the same size.')
             end
-            if A.transp ~= 0 || A.transp ~= 0
-                error('Matrix lazy-transpose not supported. Use full_transpose.')
+            if ~isreal(A) || ~isreal(B)
+                error('Complex addition not supported at the moment.')
+            end
+            if A.transp ~= B.transp
+                error('Matrix lazy-transpose not fully supported. Use full_transpose.')
             end
             validateattributes(a,{'numeric'},{'real','scalar','finite'},'','a');
             validateattributes(b,{'numeric'},{'real','scalar','finite'},'','b');
             [m n] = size(A);
+            if A.transp
+                [n m] = size(A);
+            else
+                [m n] = size(A);
+            end
             C = gpuSparse(m,n);
+            C.transp = A.transp;
             [C.row C.col C.val] = csrgeam(A.row,A.col,A.val,m,n,B.row,B.col,B.val,a,b);
         end
   
@@ -229,7 +238,7 @@ classdef gpuSparse
             if isempty(x)
                 error('Argument x is empty.')
             elseif ~isnumeric(x)
-                error('Argument x must be numeric.')
+                error('Argument x must be numeric (%s not supported).',class(x))
             elseif isscalar(x)
                 y = A;
                 y.val = y.val * x;
@@ -264,7 +273,7 @@ classdef gpuSparse
             if isempty(x)
                 error('Argument x is empty.')
             elseif ~isnumeric(x)
-                error('Argument x must be numeric.') 
+                error('Argument x must be numeric (%s not supported).',class(x)) 
             elseif isscalar(x)
                 y = A;
                 y.val = y.val .* x;
@@ -392,9 +401,15 @@ classdef gpuSparse
         
         % overload sparse (returns sparse matrix on CPU): not efficient, for debugging
         function A_sp = sparse(A)
-            [m n] = size(A);
+            if A.transp
+                [n m] = size(A);
+            else
+                [m n] = size(A);
+            end
             [i j v] = find(A);
-            A_sp = sparse(i,j,double(v),m,n); % args must be double
+            A_sp = sparse(i,j,double(v),m,n);
+            if A.transp == 1; A_sp = A_sp.'; end
+            if A.transp == 2; A_sp = A_sp'; end
         end
 
         % overload full (returns full matrix on CPU): not efficient, for debugging
