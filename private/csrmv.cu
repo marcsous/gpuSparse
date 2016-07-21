@@ -62,7 +62,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     int ncols = (int)mxGetScalar(NCOLS);
 
     mwSize *xdims = (mwSize*)mxGPUGetDimensions(x); // xdims always has >= 2 elements
-    if (xdims[1] != 1 || mxGPUGetNumberOfDimensions(x) > 2) mxShowCriticalErrorMessage("X has too many dimensions");
+    if (xdims[1] != 1 || mxGPUGetNumberOfDimensions(x) > 2) mxShowCriticalErrorMessage("X argument is not a vector");
     int nx = xdims[0];
 
     if (mxGPUGetNumberOfElements(row_csr) != nrows+1) mxShowCriticalErrorMessage("ROW_CSR argument wrong size");
@@ -113,12 +113,9 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
     cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE); // MATLAB unit offset
 
-    // Convert from matlab pointers to native pointers 
+    // Convert from matlab pointers to native pointers
     int *d_row_csr = (int*)mxGPUGetDataReadOnly(row_csr);
     int *d_col = (int*)mxGPUGetDataReadOnly(col);
-    float *d_val = (float*)mxGPUGetDataReadOnly(val);
-    float *d_x = (float*)mxGPUGetDataReadOnly(x);
-    float *d_y = (float*)mxGPUGetData(y);
 
     // Now we can access the arrays, we can do some checks
     int base;
@@ -131,18 +128,38 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if (nnz_check != nnz) mxShowCriticalErrorMessage("ROW_CSR argument last element != nnz");
 
     // Call cusparse multiply function in (S)ingle precision
-    float alpha = 1.0;
-    float beta = 0.0;
-	char message[128];
+    char message[128];
+    cusparseStatus_t status;
 
-#if CUDART_VERSION < 8000
-    cusparseStatus_t status =
-    cusparseScsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
-	sprintf(message,"\nOperation cusparseScsrmv failed with error code %i",status);
+#if CUDART_VERSION < 8000 // FOR CUDA 7.5
+    if (ccx == mxREAL)
+    {
+    	float alpha = 1;
+    	float beta = 0;
+    	float *d_val = (float*)mxGPUGetDataReadOnly(val);
+    	float *d_x = (float*)mxGPUGetDataReadOnly(x);
+    	float *d_y = (float*)mxGPUGetData(y);
+
+    	status =
+    	cusparseScsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+    }
+    else
+    {
+    	cuComplex alpha, beta;
+	alpha.x = 1; alpha.y = 0; beta.x = 0; beta.y = 0;
+    	cuComplex *d_val = (cuComplex*)mxGPUGetDataReadOnly(val);
+    	cuComplex *d_x = (cuComplex*)mxGPUGetDataReadOnly(x);
+    	cuComplex *d_y = (cuComplex*)mxGPUGetData(y);
+
+	status =
+	cusparseCcsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+    }
+    sprintf(message,"\nOperation cusparseScsrmv failed with error code %i",status);
 #else
-    cusparseStatus_t status =
+    // NOT WORKING - WANT TO USE THE MP LIBRARY FOR TRANSPOSE MULTIPLY
+    status =
     cusparseScsrmv_mp(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
-	sprintf(message,"\nOperation cusparseScsrmv_mp failed with error code %i",status);
+    sprintf(message,"\nOperation cusparseScsrmv_mp failed with error code %i",status);
 #endif
 
     if (status == CUSPARSE_STATUS_SUCCESS)
