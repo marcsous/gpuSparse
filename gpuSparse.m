@@ -10,8 +10,8 @@ classdef gpuSparse
     %%
     properties (SetAccess=private, SetObservable=true)
         
-        nrows @ int32 = int32(0); % number of rows
-        ncols @ int32 = int32(0); % number of columns
+        nrows @ int32 scalar = 0; % number of rows
+        ncols @ int32 scalar = 0; % number of columns
         
         row @ gpuArray = zeros(0,1,'int32','gpuArray'); % row index (CSR format)
         col @ gpuArray = zeros(0,1,'int32','gpuArray'); % column index
@@ -21,7 +21,7 @@ classdef gpuSparse
         %  0 = CUSPARSE_OPERATION_NON_TRANSPOSE
         %  1 = CUSPARSE_OPERATION_TRANSPOSE
         %  2 = CUSPARSE_OPERATION_CONJUGATE_TRANSPOSE
-        transp @ int32 = int32(0);
+        transp @ int32 scalar = 0;
         
     end
     
@@ -69,7 +69,7 @@ classdef gpuSparse
                 error('Wrong number of arguments.');
             end
             
-            % validate arguments
+            % validate arguments - slow to check if integer but adds flexibility
             if numel(row)~=numel(val); error('row and val size mismatch.'); end
             if numel(col)~=numel(val); error('col and val size mismatch.'); end
             
@@ -115,14 +115,10 @@ classdef gpuSparse
             
             % check and apply user-supplied sizes
             if exist('nrows','var')
-                nrows = gather(nrows);
-                validateattributes(nrows,{'numeric'},{'scalar','integer','>=',A.nrows},'','nrows');
-                A.nrows = int32(nrows);
+                A.nrows = gather(nrows);
             end
             if exist('ncols','var')
-                ncols = gather(ncols);
-                validateattributes(ncols,{'numeric'},{'scalar','integer','>=',A.ncols},'','ncols');
-                A.ncols = int32(ncols);
+                A.ncols = gather(ncols);
             end
             
             % check upper bounds
@@ -154,9 +150,43 @@ classdef gpuSparse
             A.row = coo2csr(row,A.nrows);
             A.col = gpuArray(col);
             A.val = gpuArray(val);
-            
+
         end
         
+        % enforce class properties
+        function A = set.nrows(A,nrows)
+            validateattributes(nrows,{'numeric'},{'scalar','integer','>=',A.nrows},'','nrows');
+            A.nrows = nrows;
+        end
+        function A = set.ncols(A,ncols)
+            validateattributes(ncols,{'numeric'},{'scalar','integer','>=',A.ncols},'','ncols');
+            A.ncols = ncols;
+        end
+        function A = set.row(A,row)
+            if ~iscolumn(row) || ~existsOnGPU(row) || ~isequal(classUnderlying(row),'int32')
+                error('Property row must be a int32 column gpuArray.')
+            end
+            A.row = row;
+        end
+        function A = set.col(A,col)
+            if ~iscolumn(col) || ~existsOnGPU(col) || ~isequal(classUnderlying(col),'int32')
+                error('Property col must be an int32 column gpuArray.')
+            end
+            A.col = col;
+        end
+        function A = set.val(A,val)
+            if ~iscolumn(val) || ~existsOnGPU(val) || ~isequal(classUnderlying(val),'single')
+                error('Property val must be a single column gpuArray.')
+            end
+            A.val = val;
+        end
+        function A = set.transp(A,transp)
+            if transp~=0 && transp~=1 && transp~=2
+                error('Property transp must be a 0, 1 or 2.')
+            end
+            A.transp = transp;
+        end
+
         % validation - helpful for testing
         function validate(A)
             
@@ -174,12 +204,12 @@ classdef gpuSparse
             if ~isequal(classUnderlying(A.val),'single'); error(message); end
             if A.nrows < 0; error(message); end
             if A.ncols < 0; error(message); end
-            if size(A.row,2) ~= 1; error(message); end
-            if size(A.col,2) ~= 1; error(message); end
-            if size(A.val,2) ~= 1; error(message); end
-            if size(A.col,1) ~= size(A.val,1); error(message); end
-            if size(A.row,1) ~= A.nrows+1; error(message); end
-            if A.transp<0 || A.transp>2; error(message); end
+            if ~iscolumn(A.row); error(message); end
+            if ~iscolumn(A.col); error(message); end
+            if ~iscolumn(A.val); error(message); end
+            if numel(A.col) ~= numel(A.val); error(message); end
+            if numel(A.row) ~= A.nrows+1; error(message); end
+            if A.transp~=0 && A.transp~=1 && A.transp~=2; error(message); end
             if numel(A.row) > 0
                 if A.row(1) ~= 1; error(message); end
                 if A.row(end) ~= numel(A.val)+1; error(message); end
@@ -187,7 +217,6 @@ classdef gpuSparse
             
             % slow checks
             if numel(A.row) > 0
-                if ~issorted(A.row); error(message); end
                 if min(A.col) < 1; error(message); end
                 if max(A.col) > A.ncols; error(message); end
                 rowcol = gather([csr2coo(A.row,A.nrows) A.col]);
@@ -351,9 +380,9 @@ classdef gpuSparse
         function A_t = transpose(A)
             A_t = A; % lazy copy
             switch A.transp
-                case 0; A_t.transp = int32(1);
-                case 1; A_t.transp = int32(0);
-                case 2; A_t.transp = int32(0); A_t.val = conj(A_t.val);
+                case 0; A_t.transp = 1;
+                case 1; A_t.transp = 0;
+                case 2; A_t.transp = 0; A_t.val = conj(A_t.val);
             end
         end
         
@@ -361,9 +390,9 @@ classdef gpuSparse
         function A_t = ctranspose(A)
             A_t = A; % lazy copy
             switch A_t.transp
-                case 0; if isreal(A_t); A_t.transp = int32(1); else A_t.transp = int32(2); end
-                case 1; A_t.transp = int32(0); if ~isreal(A_t); A_t.val = conj(A_t.val); end
-                case 2; A_t.transp = int32(0);
+                case 0; if isreal(A_t); A_t.transp = 1; else A_t.transp = 2; end
+                case 1; A_t.transp = 0; if ~isreal(A_t); A_t.val = conj(A_t.val); end
+                case 2; A_t.transp = 0;
             end
         end
         
