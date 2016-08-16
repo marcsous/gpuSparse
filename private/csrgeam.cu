@@ -105,7 +105,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     cusparseStatus = cusparseCreateMatDescr(&descr);
     checkCudaErrors(cusparseStatus);
     cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
-    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE); // MATLAB unit offset
+    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
 
     // Convert from matlab pointers to native pointers
     int *d_a_col = (int*)mxGPUGetDataReadOnly(a_col);
@@ -125,14 +125,14 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 
     int nnz_check;
     cudaMemcpy(&nnz_check, d_a_row_csr+nrows, sizeof(int), cudaMemcpyDeviceToHost);
-    nnz_check -= CUSPARSE_INDEX_BASE_ONE; // MATLAB unit offset
+    nnz_check -= CUSPARSE_INDEX_BASE_ONE;
     if (nnz_check != a_nnz) mxShowCriticalErrorMessage("A_ROW_CSR argument last element != nnz");
 
     cudaMemcpy(&base, d_b_row_csr, sizeof(int), cudaMemcpyDeviceToHost);
     if (base != CUSPARSE_INDEX_BASE_ONE) mxShowCriticalErrorMessage("B_ROW_CSR not using 1-based indexing");
 
     cudaMemcpy(&nnz_check, d_b_row_csr+nrows, sizeof(int), cudaMemcpyDeviceToHost);
-    nnz_check -= CUSPARSE_INDEX_BASE_ONE; // MATLAB unit offset
+    nnz_check -= CUSPARSE_INDEX_BASE_ONE;
     if (nnz_check != b_nnz) mxShowCriticalErrorMessage("B_ROW_CSR argument last element != nnz");
 
     // Get sparsity pattern and nnz of output matrix
@@ -160,7 +160,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     }
     else
     {
-    	int baseC = CUSPARSE_INDEX_BASE_ONE; // MATLAB unit offset
+    	int baseC = CUSPARSE_INDEX_BASE_ONE;
 	cudaMemcpy(&c_nnz, d_c_row_csr+nrows, sizeof(int), cudaMemcpyDeviceToHost);
 	cudaMemcpy(&baseC, c_row_csr, sizeof(int), cudaMemcpyDeviceToHost);
 	c_nnz -= baseC;

@@ -116,7 +116,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     cusparseStatus = cusparseCreateMatDescr(&descr);
     checkCudaErrors(cusparseStatus);
     cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
-    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE); // MATLAB unit offset
+    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
 
     // Convert from matlab pointers to native pointers 
     int *d_row_csr = (int*)mxGPUGetDataReadOnly(row_csr);
@@ -132,7 +132,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 
     int nnz_check;
     cudaMemcpy(&nnz_check, d_row_csr+m, sizeof(int), cudaMemcpyDeviceToHost);
-    nnz_check -= CUSPARSE_INDEX_BASE_ONE; // MATLAB unit offset
+    nnz_check -= CUSPARSE_INDEX_BASE_ONE;
     if (nnz_check != nnz) mxShowCriticalErrorMessage("ROW_CSR argument last element != nnz");
 
     // Call cusparse multiply function in (S)ingle precision

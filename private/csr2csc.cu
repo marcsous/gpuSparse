@@ -71,7 +71,8 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     mxGPUArray *row = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
     if (row==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
-    mxGPUArray *val_csc = mxGPUCreateGPUArray(ndim, dims, mxSINGLE_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
+    mxComplexity ccx = mxGPUGetComplexity(val);
+    mxGPUArray *val_csc = mxGPUCreateGPUArray(ndim, dims, mxSINGLE_CLASS, ccx, MX_GPU_DO_NOT_INITIALIZE);
     if (val_csc==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
     // Get handle to the CUBLAS context
@@ -89,16 +90,14 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     cusparseStatus = cusparseCreateMatDescr(&descr);
     checkCudaErrors(cusparseStatus);
     cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
-    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE); // MATLAB unit offset
+    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
 
     // Convert from matlab pointers to native pointers 
     int *d_row_csr = (int*)mxGPUGetDataReadOnly(row_csr);
     int *d_col = (int*)mxGPUGetDataReadOnly(col);
-    float *d_val = (float*)mxGPUGetDataReadOnly(val);
 
     int *d_row = (int*)mxGPUGetData(row);
     int *d_col_csc = (int*)mxGPUGetData(col_csc);
-    float *d_val_csc = (float*)mxGPUGetData(val_csc);
 
     // Now we can access row_csr[] array
     int base;
@@ -107,12 +106,26 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 
     int nnz_check;
     cudaMemcpy(&nnz_check, d_row_csr+nrows, sizeof(int), cudaMemcpyDeviceToHost);
-    nnz_check -= CUSPARSE_INDEX_BASE_ONE; // MATLAB unit offset
+    nnz_check -= CUSPARSE_INDEX_BASE_ONE;
     if (nnz_check != nnz) mxShowCriticalErrorMessage("ROW_CSR argument last element != nnz");
 
     // Convert from CSR to CSC
-    cusparseStatus_t status =
-    cusparseScsr2csc(cusparseHandle, nrows, ncols, nnz, d_val, d_row_csr, d_col, d_val_csc, d_row, d_col_csc, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ONE); // MATLAB unit offset
+    cusparseStatus_t status;
+
+    if (ccx == mxREAL)
+    {
+    	float *d_val = (float*)mxGPUGetDataReadOnly(val);
+    	float *d_val_csc = (float*)mxGPUGetData(val_csc);
+	status =
+  	cusparseScsr2csc(cusparseHandle, nrows, ncols, nnz, d_val, d_row_csr, d_col, d_val_csc, d_row, d_col_csc, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ONE);
+    }
+    else
+    {
+    	cuComplex *d_val = (cuComplex*)mxGPUGetDataReadOnly(val);
+    	cuComplex *d_val_csc = (cuComplex*)mxGPUGetData(val_csc);
+	status =
+  	cusparseCcsr2csc(cusparseHandle, nrows, ncols, nnz, d_val, d_row_csr, d_col, d_val_csc, d_row, d_col_csc, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ONE);
+    }
 
     if (status == CUSPARSE_STATUS_SUCCESS)
     {

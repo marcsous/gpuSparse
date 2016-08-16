@@ -70,7 +70,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     cusparseStatus = cusparseCreateMatDescr(&descr);
     checkCudaErrors(cusparseStatus);
     cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
-    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE); // MATLAB unit offset
+    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
 
     // Convert from matlab pointers to native pointers 
     int *d_row = (int*)mxGPUGetDataReadOnly(row);
@@ -84,7 +84,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 	buffer = (int *)mxMalloc((nrows+1)*sizeof(int));
 	if (buffer == NULL) mxShowCriticalErrorMessage("mxMalloc failed");
 
-    	for (int j=0; j<nrows+1; j++) buffer[j] = CUSPARSE_INDEX_BASE_ONE; // MATLAB unit offset
+    	for (int j=0; j<nrows+1; j++) buffer[j] = CUSPARSE_INDEX_BASE_ONE;
 
 	cudaError_t status =
  	cudaMemcpy((void *)d_row_csr, buffer, (nrows+1)*sizeof(int), cudaMemcpyHostToDevice);
@@ -95,7 +95,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     else
     {
     	cusparseStatus_t status =
-    	cusparseXcoo2csr(cusparseHandle, d_row, nnz, nrows, d_row_csr, CUSPARSE_INDEX_BASE_ONE); // MATLAB unit offset
+    	cusparseXcoo2csr(cusparseHandle, d_row, nnz, nrows, d_row_csr, CUSPARSE_INDEX_BASE_ONE);
     
 	if (status != CUSPARSE_STATUS_SUCCESS)
 	    sprintf(message,"\nOperation cusparseXcoo2csr failed with error code %i",status);

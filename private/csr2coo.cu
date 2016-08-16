@@ -64,7 +64,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     cusparseStatus = cusparseCreateMatDescr(&descr);
     checkCudaErrors(cusparseStatus);
     cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
-    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE); // MATLAB unit offset
+    cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
 
     // Convert from matlab pointers to native pointers 
     int *d_row_csr = (int*)mxGPUGetDataReadOnly(row_csr);
@@ -76,7 +76,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 
     int nnz;
     cudaMemcpy(&nnz, d_row_csr+nrows, sizeof(int), cudaMemcpyDeviceToHost);
-    nnz -= CUSPARSE_INDEX_BASE_ONE; // MATLAB unit offset
+    nnz -= CUSPARSE_INDEX_BASE_ONE;
     if (nnz < 0) mxShowCriticalErrorMessage("ROW_CSR returned negative nnz");
 
     // Create space for output vector
@@ -90,7 +90,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 
     // Call csr2coo
     cusparseStatus_t status =
-    cusparseXcsr2coo(cusparseHandle, d_row_csr, nnz, nrows, d_row, CUSPARSE_INDEX_BASE_ONE); // MATLAB unit offset
+    cusparseXcsr2coo(cusparseHandle, d_row_csr, nnz, nrows, d_row, CUSPARSE_INDEX_BASE_ONE);
 
     if (status == CUSPARSE_STATUS_SUCCESS)
     {

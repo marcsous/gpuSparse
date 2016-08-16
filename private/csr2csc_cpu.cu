@@ -5,8 +5,8 @@
 //    http://www.dgate.org/~brg/files/dis/smvm/frontend/matrix_io.c
 //
 
-void csr2csc(const int nrows, const int ncols, const float *val, const int *col, const int *row_csr,
-             float *val_csc, int *row, int *col_csc)
+void csr2csc(const int nrows, const int ncols, const int *row_csr, const int *col, const float *val_real, const float *val_imag,
+             int *row, int *col_csc, float *val_csc_real, float *val_csc_imag)
 {
   int i, j, k, l;
 
@@ -14,14 +14,12 @@ void csr2csc(const int nrows, const int ncols, const float *val, const int *col,
   const int base = row_csr[0];
   const int nnz = row_csr[nrows]-base;
 
-  for (i=0; i<=ncols; i++) col_csc[i] = 0;
-
   // Determine column lengths
+  for (i=0; i<=ncols; i++) col_csc[i] = 0;
   for (i=0; i<nnz; i++) col_csc[col[i]+1-base]++;
-
   for (i=0; i<ncols; i++) col_csc[i+1] += col_csc[i];
 
-  // Fill in output array
+  // Fill in output arrays
   for (i=0; i<nrows; i++)
   {
     for (j=row_csr[i]-base; j<row_csr[i+1]-base; j++)
@@ -29,7 +27,8 @@ void csr2csc(const int nrows, const int ncols, const float *val, const int *col,
       k = col[j]-base;
       l = col_csc[k]++;
       row[l] = i+base;
-      val_csc[l] = val[j];
+      if (val_real) val_csc_real[l] = val_real[j];
+      if (val_imag) val_csc_imag[l] = val_imag[j];
     }
   }
 
@@ -86,28 +85,31 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     ROW = mxCreateUninitNumericArray(ndim, dims, mxINT32_CLASS, mxREAL);
     if (ROW==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
-    VAL_CSC = mxCreateUninitNumericArray(ndim, dims, mxSINGLE_CLASS, mxREAL);
+    mxComplexity ccx = mxGetPi(VAL) ? mxCOMPLEX : mxREAL;
+    VAL_CSC = mxCreateUninitNumericArray(ndim, dims, mxSINGLE_CLASS, ccx);
     if (VAL_CSC==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
  
     // Pointers to the raw data
     int *row_csr = (int *)mxGetData(ROW_CSR);
     int *col = (int *)mxGetData(COL);
-    float *val = (float *)mxGetData(VAL);
-
+    float *val_real = (float *)mxGetData(VAL);
+    float *val_imag = (float *)mxGetImagData(VAL);
+    	
     int *row = (int *)mxGetData(ROW);
     int *col_csc = (int *)mxGetData(COL_CSC);
-    float *val_csc = (float *)mxGetData(VAL_CSC);
-
+    float *val_csc_real = (float *)mxGetData(VAL_CSC);
+    float *val_csc_imag = (float *)mxGetImagData(VAL_CSC);
+    
     // Now we can access the arrays, we can do some checks
     int base = row_csr[0];
     if (base != 1) mxShowCriticalErrorMessage("ROW_CSR not using 1-based indexing");
 
     int nnz_check = row_csr[nrows];
-    nnz_check -= 1; // MATLAB unit offset
+    nnz_check -= 1;
     if (nnz_check != nnz) mxShowCriticalErrorMessage("ROW_CSR argument last element != nnz");
 
     // Convert from CSR to CSC
-    csr2csc(nrows, ncols, val, col, row_csr, val_csc, row, col_csc);
+    csr2csc(nrows, ncols, row_csr, col, val_real, val_imag, row, col_csc, val_csc_real, val_csc_imag);
 
     return;
 }
