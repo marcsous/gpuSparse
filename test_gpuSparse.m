@@ -1,9 +1,9 @@
 % test gpuSparse class
 clear all
 
-M = 11020;
-N = 13334;
-P = 0.005;
+M = 121401;
+N = 113331;
+P = 0.0005;
 TOL = 1e-4; % floating point tolerance (sparse is double and gpuSparse is single)
 
 disp('---SETUP---')
@@ -23,44 +23,43 @@ y = rand(M,1);
 %% accuracy
 disp('---ACCURACY---')
 
-disp(['  Ax     A''*y         ' num2str([norm([A*x-a*single(x)],Inf) norm([A'*y-a'*single(y)],Inf)] > TOL)])
+disp(['  Ax            ' num2str(norm(A*x-a*single(x),Inf) > TOL)])
+disp(['  A''*y          ' num2str(norm(A'*y-a'*single(y),Inf) > TOL)])
 
 B = sprand(M,N,P);
 b = gpuSparse(B); validate(b)
 
-
 C=A+B;
 c=a+b; validate(c)
-disp(['(A+B)x (A+B)''*y       ' num2str([norm([C*x-c*single(x)],Inf) norm([C'*y-c'*single(y)],Inf)] > TOL)])
-
+disp(['(A+B)x          ' num2str(norm(C*x-c*single(x),Inf) > TOL)])
+disp(['(A+B)''*y        ' num2str(norm(C'*y-c'*single(y),Inf) > TOL)])
 
 C=A-B;
 c=a-b; validate(c)
-disp(['(A-B)x (A-B)''*y       ' num2str([norm([C*x-c*single(x)],Inf) norm([C'*y-c'*single(y)],Inf)] > TOL)])
-
+disp(['(A-B)x          ' num2str(norm(C*x-c*single(x),Inf) > TOL)])
+disp(['(A-B)''*y        ' num2str(norm(C'*y-c'*single(y),Inf) > TOL)])
 
 d = a - (a')'; validate(d)
-disp(['max(a-a'''') min(a-a'''') ' num2str([max(d.val) min(d.val)] > TOL)])
+disp(['max(a-a'''')      ' num2str(max(d.val) > TOL)])
+disp(['min(a-a'''')      ' num2str(min(d.val) > TOL)])
 
 d = a - full_transpose(full_transpose(a)); validate(d)
-disp(['max(a-a'''') min(a-a'''') ' num2str([max(d.val) min(d.val)] > TOL) ' (full_transpose)'])
+disp(['max(a-a'''')      ' num2str(max(d.val) > TOL) '  (full_transpose)'])
+disp(['min(a-a'''')      ' num2str(min(d.val) > TOL) '  (full_transpose)'])
 
 B = randn(N,3);
 b = gpuArray(B);
 
 C = A*B;
 c = a*single(b);
-disp(['(A*B - a*b)           ' num2str([norm([C-c],Inf)] > TOL)])
+disp(['(A*B-a*b)       ' num2str([norm([C-c],Inf)] > TOL)])
 
 B = randn(M,4);
 b = gpuArray(B);
 
 C = A'*B;
 c = a'*single(b);
-disp(['(A''*B - a''*b)         ' num2str([norm([C-c],Inf)] > TOL)])
-
-
-disp(['(A''*B - a''*b) (complex matrices not supported)'])
+disp(['(A''*B-a''*b)     ' num2str([norm([C-c],Inf)] > TOL)])
 
 
 %% miscellaneous operations
@@ -75,7 +74,7 @@ a = gpuSparse(A); validate(a)
 x = single(rand(N,1) + i*rand(N,1));
 y = single(rand(M,1) + i*rand(M,1));
 
-disp('complex transpose multiplies')
+disp('complex multiplies')
 disp(norm(A*double(x) - a*x,Inf) > TOL)
 disp(norm(A'*double(y) - a'*y,Inf) > TOL)
 disp(norm(A.'*double(y) - a.'*y,Inf) > TOL)
@@ -121,7 +120,7 @@ disp(norm(nonzeros(A)-nonzeros(a),inf) > TOL)
 disp(norm(nonzeros(A')-nonzeros(a'),inf) > TOL)
 disp(norm(nonzeros(A.')-nonzeros(a.'),inf) > TOL)
 
-disp('addition (only real matrices are supported)')
+disp('addition')
 B = sprandn(M,N,P);
 b = gpuSparse(B); validate(b)
 

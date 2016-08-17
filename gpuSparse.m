@@ -88,7 +88,7 @@ classdef gpuSparse
             % 3) everything seems to work without the col sort
             % 4) issorted/sortrows with 2D array is not supported on gpu (R2016a)
             sort_row_only = false;
-            %
+
             if sort_row_only
                 if ~issorted(row)
                     [row k] = sort(row);
@@ -105,20 +105,24 @@ classdef gpuSparse
                 end
             end
             
-            % check lower bounds
+            % check lower bounds and get default values for matrix size
             if numel(row) > 0
                 if row(1)<1; error('All row indices must be greater than zero.'); end
                 if min(col)<1; error('All col indices must be greater than zero.'); end
-                A.nrows = gather(row(end));
+                A.nrows = gather(row(end)); % still in COO format, sorted ascending
                 A.ncols = gather(max(col));
             end
-            
+
             % check and apply user-supplied sizes
             if exist('nrows','var')
-                A.nrows = gather(nrows);
+                nrows = gather(nrows);
+                validateattributes(nrows,{'numeric'},{'scalar','integer','>=',A.nrows},'','nrows');
+                A.nrows = nrows;
             end
             if exist('ncols','var')
-                A.ncols = gather(ncols);
+                ncols = gather(ncols);
+                validateattributes(ncols,{'numeric'},{'scalar','integer','>=',A.ncols},'','ncols');
+                A.ncols = ncols;
             end
             
             % check upper bounds
@@ -154,29 +158,21 @@ classdef gpuSparse
         end
         
         % enforce class properties
-        function A = set.nrows(A,nrows)
-            validateattributes(nrows,{'numeric'},{'scalar','integer','>=',A.nrows},'','nrows');
-            A.nrows = nrows;
-        end
-        function A = set.ncols(A,ncols)
-            validateattributes(ncols,{'numeric'},{'scalar','integer','>=',A.ncols},'','ncols');
-            A.ncols = ncols;
-        end
         function A = set.row(A,row)
-            if ~iscolumn(row) || ~existsOnGPU(row) || ~isequal(classUnderlying(row),'int32')
-                error('Property row must be a int32 column gpuArray.')
+            if ~iscolumn(row) || ~isequal(classUnderlying(row),'int32')
+                error('Property row must be a column vector of int32s.')
             end
             A.row = row;
         end
         function A = set.col(A,col)
-            if ~iscolumn(col) || ~existsOnGPU(col) || ~isequal(classUnderlying(col),'int32')
-                error('Property col must be an int32 column gpuArray.')
+            if ~iscolumn(col) || ~isequal(classUnderlying(col),'int32')
+                error('Property col must be a column vector of int32s.')
             end
             A.col = col;
         end
         function A = set.val(A,val)
-            if ~iscolumn(val) || ~existsOnGPU(val) || ~isequal(classUnderlying(val),'single')
-                error('Property val must be a single column gpuArray.')
+            if ~iscolumn(val) || ~isequal(classUnderlying(val),'single')
+                error('Property val must be a column vector of singles.')
             end
             A.val = val;
         end
@@ -509,7 +505,7 @@ classdef gpuSparse
             elseif isequal(p,Inf)
                 retval = max(sum(abs(A),2));
             elseif isequal(p,'fro');
-                retval = sqrt(real(dot(A.val,A.val)));
+                retval = norm(A.val);
             else
                 error('The only matrix norms available are 1, 2, inf, and ''fro''.');
             end
