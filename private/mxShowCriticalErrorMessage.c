@@ -5,39 +5,41 @@
 //
 
 // Use macro to expand __FILE__ and __LINE__ correctly
-#define mxShowCriticalErrorMessage(...) error_function(basename(__FILE__),__LINE__,##__VA_ARGS__)
+#define mxShowCriticalErrorMessage(...) err_fn(basename(__FILE__),__LINE__,##__VA_ARGS__)
 
 // Use overloads to handle __VA_ARGS__ correctly
-void error_function(const char *function_name, int line_number, const char *error_message, int error_code)
+void err_fn(const char *fn_name, int line_no, const char *err_message, int err_code)
 {
-    mxArray *err_args[5];
-    err_args[0] = mxCreateString("%s(%i): %s (%i).");
-    err_args[1] = mxCreateString(function_name);
+    const int nargs = 5;
+    mxArray *err_args[nargs];
+    err_args[0] = mxCreateString("\n%s(%i): %s (%i).\n");
+    err_args[1] = mxCreateString(fn_name);
     err_args[2] = mxCreateDoubleMatrix(1,1,mxREAL);
-    err_args[3] = mxCreateString(error_message);
+    err_args[3] = mxCreateString(err_message);
     err_args[4] = mxCreateDoubleMatrix(1,1,mxREAL);
-    *mxGetPr(err_args[2]) = line_number;
-    *mxGetPr(err_args[4]) = error_code;
-    mexCallMATLAB(0,0,5,err_args,"error");
+    *mxGetPr(err_args[2]) = line_no;
+    *mxGetPr(err_args[4]) = err_code;
+    mexCallMATLAB(0,0,nargs,err_args,"error");
 }
 
-void error_function(const char *function_name, int line_number, const char *error_message)
+void err_fn(const char *fn_name, int line_no, const char *err_message)
 {
-    mxArray *err_args[4];
-    err_args[0] = mxCreateString("%s(%i): %s.");
-    err_args[1] = mxCreateString(function_name);
+    const int nargs = 4;
+    mxArray *err_args[nargs];
+    err_args[0] = mxCreateString("\n%s(%i): %s.\n");
+    err_args[1] = mxCreateString(fn_name);
     err_args[2] = mxCreateDoubleMatrix(1,1,mxREAL);
-    err_args[3] = mxCreateString(error_message);
-    *mxGetPr(err_args[2]) = line_number;
-    mexCallMATLAB(0,0,4,err_args,"error");
+    err_args[3] = mxCreateString(err_message);
+    *mxGetPr(err_args[2]) = line_no;
+    mexCallMATLAB(0,0,nargs,err_args,"error");
 }
 
-void error_function(const char *function_name, int line_number, int error_code)
+void err_fn(const char *fn_name, int line_no, int err_code)
 {
-    error_function(function_name, line_number, "Error occurred", error_code);
+    err_fn(fn_name, line_no, "Error occurred", err_code);
 }
 
-void error_function(const char *function_name, int line_number)
+void err_fn(const char *fn_name, int line_no)
 {
-    error_function(function_name, line_number, "Error occurred");
+    err_fn(fn_name, line_no, "Error occurred");
 }
