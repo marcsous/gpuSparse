@@ -16,10 +16,6 @@
 #include <cusparse.h>
 #include <cublas_v2.h>
 
-// Utilities and system includes
-#include <helper_functions.h>  // helper for shared functions common to CUDA Samples
-#include <helper_cuda.h>       // helper function CUDA error checking and initialization
-
 // MATLAB related
 #include "mex.h"
 #include "gpu/mxGPUArray.h"
@@ -35,8 +31,8 @@
 void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 {
     // Checks
-    if (nlhs > 1) mxShowCriticalErrorMessage("wrong number of output arguments");
-    if (nrhs != 2) mxShowCriticalErrorMessage("wrong number of input arguments");
+    if (nlhs > 1) mxShowCriticalErrorMessage("wrong number of output arguments",nlhs);
+    if (nrhs != 2) mxShowCriticalErrorMessage("wrong number of input arguments",nrhs);
 
     // Initialize the MathWorks GPU API
     mxInitGPU();
@@ -45,29 +41,31 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     mxGPUArray const *row_csr = mxGPUCreateFromMxArray(ROW_CSR);
 
     // Checks - note rows must be in CSR format
-    int nrows = (int)mxGetScalar(NROWS);
-    if (mxGPUGetNumberOfElements(row_csr) != nrows+1) mxShowCriticalErrorMessage("ROW_CSR argument is wrong size");
+    if (!mxIsScalar(NROWS)) mxShowCriticalErrorMessage("NROWS argument must be a scalar");
     if (mxGPUGetClassID(row_csr) != mxINT32_CLASS) mxShowCriticalErrorMessage("ROW_CSR argument is not int32");
+    int nrows = (int)mxGetScalar(NROWS);
+    if (mxGPUGetNumberOfElements(row_csr) != nrows+1) mxShowCriticalErrorMessage("ROW_CSR argument is wrong size",mxGPUGetNumberOfElements(row_csr));
 
     // Get handle to the CUBLAS context
     cublasHandle_t cublasHandle = 0;
     cublasStatus_t cublasStatus;
     cublasStatus = cublasCreate(&cublasHandle);
-    checkCudaErrors(cublasStatus);
+    if (cublasStatus != CUBLAS_STATUS_SUCCESS) mxShowCriticalErrorMessage(cublasStatus);
 
     // Get handle to the CUSPARSE context
+    cusparseStatus_t status;
     cusparseHandle_t cusparseHandle = 0;
     cusparseStatus_t cusparseStatus;
     cusparseStatus = cusparseCreate(&cusparseHandle);
-    checkCudaErrors(cusparseStatus);
+    if (cusparseStatus != CUSPARSE_STATUS_SUCCESS) mxShowCriticalErrorMessage(cusparseStatus);
     cusparseMatDescr_t descr = 0;
     cusparseStatus = cusparseCreateMatDescr(&descr);
-    checkCudaErrors(cusparseStatus);
+    if (cusparseStatus != CUSPARSE_STATUS_SUCCESS) mxShowCriticalErrorMessage(cusparseStatus);
     cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
     cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
 
     // Convert from matlab pointers to native pointers 
-    int *d_row_csr = (int*)mxGPUGetDataReadOnly(row_csr);
+    const int * const d_row_csr = (int*)mxGPUGetDataReadOnly(row_csr);
 
     // Now we can access the arrays, we can do some checks
     int base;
@@ -89,8 +87,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     int *d_row = (int*)mxGPUGetData(row);
 
     // Call csr2coo
-    cusparseStatus_t status =
-    cusparseXcsr2coo(cusparseHandle, d_row_csr, nnz, nrows, d_row, CUSPARSE_INDEX_BASE_ONE);
+    status = cusparseXcsr2coo(cusparseHandle, d_row_csr, nnz, nrows, d_row, CUSPARSE_INDEX_BASE_ONE);
 
     if (status == CUSPARSE_STATUS_SUCCESS)
     {
@@ -102,6 +99,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     }
 
     // Clean up
+    cusparseDestroyMatDescr(descr);
     cusparseDestroy(cusparseHandle);
     cublasDestroy(cublasHandle);
     mxGPUDestroyGPUArray(row);
@@ -110,9 +108,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     // Failure
     if (status != CUSPARSE_STATUS_SUCCESS)
     {
-	char message[128];
-	sprintf(message,"\nOperation cusparseXcsr2coo failed with error code %i.",status);
-	mxShowCriticalErrorMessage(message);
+	mxShowCriticalErrorMessage("Operation cusparseXcsr2coo failed",status);
     }
 
     return;

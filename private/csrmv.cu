@@ -16,10 +16,6 @@
 #include <cusparse.h>
 #include <cublas_v2.h>
 
-// Utilities and system includes
-#include <helper_functions.h>  // helper for shared functions common to CUDA Samples
-#include <helper_cuda.h>       // helper function CUDA error checking and initialization
-
 // MATLAB related
 #include "mex.h"
 #include "gpu/mxGPUArray.h"
@@ -40,12 +36,17 @@
 void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 {
     // Checks
-    if (nlhs > 1) mxShowCriticalErrorMessage("wrong number of output arguments");
-    if (nrhs != 7) mxShowCriticalErrorMessage("wrong number of input arguments");
+    if (nlhs > 1) mxShowCriticalErrorMessage("wrong number of output arguments",nlhs);
+    if (nrhs != 7) mxShowCriticalErrorMessage("wrong number of input arguments",nrhs);
 
-    if(mxIsGPUArray(ROW_CSR) == 0) mxShowCriticalErrorMessage("ROW_CSR argument is not on GPU");
-    if(mxIsGPUArray(COL) == 0) mxShowCriticalErrorMessage("COL argument is not on GPU");
-    if(mxIsGPUArray(VAL) == 0) mxShowCriticalErrorMessage("VAL argument is not on GPU");
+    if(!mxIsGPUArray(ROW_CSR)) mxShowCriticalErrorMessage("ROW_CSR argument is not on GPU");
+    if(!mxIsGPUArray(COL)) mxShowCriticalErrorMessage("COL argument is not on GPU");
+    if(!mxIsGPUArray(VAL)) mxShowCriticalErrorMessage("VAL argument is not on GPU");
+    //if(!mxIsGPUArray(X)) mxShowCriticalErrorMessage("B argument is not on GPU");
+
+    if (!mxIsScalar(NROWS)) mxShowCriticalErrorMessage("NROWS argument must be a scalar");
+    if (!mxIsScalar(NCOLS)) mxShowCriticalErrorMessage("NCOLS argument must be a scalar");
+    if (!mxIsScalar(TRANS)) mxShowCriticalErrorMessage("TRANS argument must be a scalar");
 
     // Initialize the MathWorks GPU API
     mxInitGPU();
@@ -62,20 +63,22 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     int ncols = (int)mxGetScalar(NCOLS);
 
     mwSize *xdims = (mwSize*)mxGPUGetDimensions(x); // xdims always has >= 2 elements
-    if (xdims[1] != 1 || mxGPUGetNumberOfDimensions(x) > 2) mxShowCriticalErrorMessage("X argument is not a vector");
+    if (mxGPUGetNumberOfDimensions(x) > 2) mxShowCriticalErrorMessage("X argument has too many dimensions",mxGPUGetNumberOfDimensions(x));
+    if (xdims[1] != 1) mxShowCriticalErrorMessage("X argument is not a column vector");
+
     int nx = xdims[0];
 
-    if (mxGPUGetNumberOfElements(row_csr) != nrows+1) mxShowCriticalErrorMessage("ROW_CSR argument wrong size");
-    if (mxGPUGetNumberOfElements(col) != nnz) mxShowCriticalErrorMessage("COL argument wrong size");
+    if (mxGPUGetNumberOfElements(row_csr) != nrows+1) mxShowCriticalErrorMessage("ROW_CSR argument wrong size",mxGPUGetNumberOfElements(row_csr));
+    if (mxGPUGetNumberOfElements(col) != nnz) mxShowCriticalErrorMessage("COL argument wrong size",mxGPUGetNumberOfElements(col));
 
     cusparseOperation_t trans = (cusparseOperation_t)mxGetScalar(TRANS);
     if (trans == CUSPARSE_OPERATION_NON_TRANSPOSE)
     {
-	if (nx != ncols) mxShowCriticalErrorMessage("X argument wrong size for multiply");
+	if (nx != ncols) mxShowCriticalErrorMessage("X argument wrong size for multiply",nx);
     }
     else
     {
-	if (nx != nrows) mxShowCriticalErrorMessage("X argument wrong size for transpose multiply");
+	if (nx != nrows) mxShowCriticalErrorMessage("X argument wrong size for transpose multiply",nx);
     }
 
     // Check types
@@ -100,22 +103,22 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     cublasHandle_t cublasHandle = 0;
     cublasStatus_t cublasStatus;
     cublasStatus = cublasCreate(&cublasHandle);
-    checkCudaErrors(cublasStatus);
+    if (cublasStatus != CUBLAS_STATUS_SUCCESS) mxShowCriticalErrorMessage(cublasStatus);
 
     // Get handle to the CUSPARSE context
     cusparseHandle_t cusparseHandle = 0;
     cusparseStatus_t cusparseStatus;
     cusparseStatus = cusparseCreate(&cusparseHandle);
-    checkCudaErrors(cusparseStatus);
+    if (cusparseStatus != CUSPARSE_STATUS_SUCCESS) mxShowCriticalErrorMessage(cusparseStatus);
     cusparseMatDescr_t descr = 0;
     cusparseStatus = cusparseCreateMatDescr(&descr);
-    checkCudaErrors(cusparseStatus);
+    if (cusparseStatus != CUSPARSE_STATUS_SUCCESS) mxShowCriticalErrorMessage(cusparseStatus);
     cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
     cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
 
     // Convert from matlab pointers to native pointers
-    int *d_row_csr = (int*)mxGPUGetDataReadOnly(row_csr);
-    int *d_col = (int*)mxGPUGetDataReadOnly(col);
+    const int * const d_row_csr = (int*)mxGPUGetDataReadOnly(row_csr);
+    const int * const d_col = (int*)mxGPUGetDataReadOnly(col);
 
     // Now we can access the arrays, we can do some checks
     int base;
@@ -125,44 +128,37 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     int nnz_check;
     cudaMemcpy(&nnz_check, d_row_csr+nrows, sizeof(int), cudaMemcpyDeviceToHost);
     nnz_check -= CUSPARSE_INDEX_BASE_ONE;
-    if (nnz_check != nnz) mxShowCriticalErrorMessage("ROW_CSR argument last element != nnz");
+    if (nnz_check != nnz) mxShowCriticalErrorMessage("ROW_CSR argument last element != nnz",nnz_check);
 
     // Call cusparse multiply function in (S)ingle precision
-    char message[128];
-    cusparseStatus_t status;
-
-#if CUDART_VERSION < 8000 // FOR CUDA 7.5
     if (ccx == mxREAL)
     {
-    	float alpha = 1;
-    	float beta = 0;
-    	float *d_val = (float*)mxGPUGetDataReadOnly(val);
-    	float *d_x = (float*)mxGPUGetDataReadOnly(x);
-    	float *d_y = (float*)mxGPUGetData(y);
-
-    	status =
-    	cusparseScsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+    	const float alpha = 1.0;
+    	const float beta = 0.0;
+	float *d_y = (float*)mxGPUGetData(y);
+    	const float * const d_val = (float*)mxGPUGetDataReadOnly(val);
+    	const float * const d_x = (float*)mxGPUGetDataReadOnly(x);
+#if CUDART_VERSION < 8000
+    	cusparseStatus = cusparseScsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+#else
+    	cusparseStatus = cusparseScsrmv_mp(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+#endif
     }
     else
     {
-    	cuComplex alpha, beta;
-	alpha.x = 1; alpha.y = 0; beta.x = 0; beta.y = 0;
-    	cuComplex *d_val = (cuComplex*)mxGPUGetDataReadOnly(val);
-    	cuComplex *d_x = (cuComplex*)mxGPUGetDataReadOnly(x);
-    	cuComplex *d_y = (cuComplex*)mxGPUGetData(y);
-
-	status =
-	cusparseCcsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
-    }
-    sprintf(message,"\nOperation cusparseScsrmv failed with error code %i",status);
+    	const cuComplex alpha = make_float2(1.0, 0.0);
+	const cuComplex beta = make_float2(0.0, 0.0);
+	cuComplex *d_y = (cuComplex*)mxGPUGetData(y);
+    	const cuComplex * const d_val = (cuComplex*)mxGPUGetDataReadOnly(val);
+    	const cuComplex * const d_x = (cuComplex*)mxGPUGetDataReadOnly(x);
+#if CUDART_VERSION < 8000
+	cusparseStatus = cusparseCcsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
 #else
-    // NOT WORKING - WANT TO USE THE MP LIBRARY FOR TRANSPOSE MULTIPLY
-    status =
-    cusparseScsrmv_mp(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
-    sprintf(message,"\nOperation cusparseScsrmv_mp failed with error code %i",status);
+    	cusparseStatus = cusparseCcsrmv_mp(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
 #endif
+    }
 
-    if (status == CUSPARSE_STATUS_SUCCESS)
+    if (cusparseStatus == CUSPARSE_STATUS_SUCCESS)
     {
     	// Return result
     	Y = mxGPUCreateMxArrayOnGPU(y);
@@ -172,6 +168,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     }
 
     // Clean up
+    cusparseDestroyMatDescr(descr);
     cusparseDestroy(cusparseHandle);
     cublasDestroy(cublasHandle);
     mxGPUDestroyGPUArray(row_csr);
@@ -182,9 +179,13 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     mxFree(xdims);
 
     // Failure
-    if (status != CUSPARSE_STATUS_SUCCESS)
+    if (cusparseStatus != CUSPARSE_STATUS_SUCCESS)
     {
-		mxShowCriticalErrorMessage(message);
+#if CUDART_VERSION < 8000
+	mxShowCriticalErrorMessage("Operation cusparseScsrmv or cusparseCcsrmv failed",cusparseStatus);
+#else
+	mxShowCriticalErrorMessage("Operation cusparseScsrmv_mp or cusparseCcsrmv_mp failed",cusparseStatus);
+#endif
     }
 
     return;

@@ -16,10 +16,6 @@
 #include <cusparse.h>
 #include <cublas_v2.h>
 
-// Utilities and system includes
-#include <helper_functions.h>  // helper for shared functions common to CUDA Samples
-#include <helper_cuda.h>       // helper function CUDA error checking and initialization
-
 // MATLAB related
 #include "mex.h"
 #include "gpu/mxGPUArray.h"
@@ -45,12 +41,17 @@
 void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 {
     // Checks
-    if (nlhs != 3) mxShowCriticalErrorMessage("wrong number of output arguments");
-    if (nrhs != 10) mxShowCriticalErrorMessage("wrong number of input arguments");
+    if (nlhs > 3) mxShowCriticalErrorMessage("wrong number of output arguments",nlhs);
+    if (nrhs != 10) mxShowCriticalErrorMessage("wrong number of input arguments",nrhs);
 
-    if(mxIsGPUArray(A_ROW_CSR) == 0) mxShowCriticalErrorMessage("A_ROW_CSR argument is not on GPU");
-    if(mxIsGPUArray(A_COL) == 0) mxShowCriticalErrorMessage("A_COL argument is not on GPU");
-    if(mxIsGPUArray(A_VAL) == 0) mxShowCriticalErrorMessage("A_VAL argument is not on GPU");
+    if(!mxIsGPUArray(A_ROW_CSR)) mxShowCriticalErrorMessage("A_ROW_CSR argument is not on GPU");
+    if(!mxIsGPUArray(A_COL)) mxShowCriticalErrorMessage("A_COL argument is not on GPU");
+    if(!mxIsGPUArray(A_VAL)) mxShowCriticalErrorMessage("A_VAL argument is not on GPU");
+
+    if (!mxIsScalar(ALPHA)) mxShowCriticalErrorMessage("ALPHA argument must be a scalar");
+    if (!mxIsScalar(BETA)) mxShowCriticalErrorMessage("BETA argument must be a scalar");
+    if (!mxIsScalar(NROWS)) mxShowCriticalErrorMessage("NROWS argument must be a scalar");
+    if (!mxIsScalar(NCOLS)) mxShowCriticalErrorMessage("NCOLS argument must be a scalar");
 
     // Initialize the MathWorks GPU API
     mxInitGPU();
@@ -70,11 +71,11 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     int nrows = (int)mxGetScalar(NROWS);
     int ncols = (int)mxGetScalar(NCOLS);
 
-    if (mxGPUGetNumberOfElements(a_row_csr) != nrows+1) mxShowCriticalErrorMessage("A_ROW_CSR argument wrong size");
-    if (mxGPUGetNumberOfElements(a_col) != a_nnz) mxShowCriticalErrorMessage("A_COL argument wrong size");
+    if (mxGPUGetNumberOfElements(a_row_csr) != nrows+1) mxShowCriticalErrorMessage("A_ROW_CSR argument wrong size",mxGPUGetNumberOfElements(a_row_csr));
+    if (mxGPUGetNumberOfElements(a_col) != a_nnz) mxShowCriticalErrorMessage("A_COL argument wrong size",mxGPUGetNumberOfElements(a_col));
 
-    if (mxGPUGetNumberOfElements(b_row_csr) != nrows+1) mxShowCriticalErrorMessage("B_ROW_CSR argument wrong size");
-    if (mxGPUGetNumberOfElements(b_col) != b_nnz) mxShowCriticalErrorMessage("B_COL argument wrong size");
+    if (mxGPUGetNumberOfElements(b_row_csr) != nrows+1) mxShowCriticalErrorMessage("B_ROW_CSR argument wrong size",mxGPUGetNumberOfElements(b_row_csr));
+    if (mxGPUGetNumberOfElements(b_col) != b_nnz) mxShowCriticalErrorMessage("B_COL argument wrong size",mxGPUGetNumberOfElements(b_col));
 
     if (mxGPUGetClassID(a_row_csr) != mxINT32_CLASS) mxShowCriticalErrorMessage("A_ROW_CSR argument is not int32");
     if (mxGPUGetClassID(a_col) != mxINT32_CLASS) mxShowCriticalErrorMessage("A_COL argument is not int32");
@@ -94,29 +95,30 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     cublasHandle_t cublasHandle = 0;
     cublasStatus_t cublasStatus;
     cublasStatus = cublasCreate(&cublasHandle);
-    checkCudaErrors(cublasStatus);
+    if (cublasStatus != CUBLAS_STATUS_SUCCESS) mxShowCriticalErrorMessage(cublasStatus);
 
     // Get handle to the CUSPARSE context
     cusparseHandle_t cusparseHandle = 0;
     cusparseStatus_t cusparseStatus;
     cusparseStatus = cusparseCreate(&cusparseHandle);
-    checkCudaErrors(cusparseStatus);
+    if (cusparseStatus != CUSPARSE_STATUS_SUCCESS) mxShowCriticalErrorMessage(cusparseStatus);
     cusparseMatDescr_t descr = 0;
     cusparseStatus = cusparseCreateMatDescr(&descr);
-    checkCudaErrors(cusparseStatus);
+    if (cusparseStatus != CUSPARSE_STATUS_SUCCESS) mxShowCriticalErrorMessage(cusparseStatus);
     cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
     cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
 
     // Convert from matlab pointers to native pointers
-    int *d_a_col = (int*)mxGPUGetDataReadOnly(a_col);
-    int *d_b_col = (int*)mxGPUGetDataReadOnly(b_col);
+    const int * const d_a_col = (int*)mxGPUGetDataReadOnly(a_col);
+    const int * const d_b_col = (int*)mxGPUGetDataReadOnly(b_col);
 
-    float *d_a_val = (float*)mxGPUGetDataReadOnly(a_val);
-    float *d_b_val = (float*)mxGPUGetDataReadOnly(b_val);
+    const float * const d_a_val = (float*)mxGPUGetDataReadOnly(a_val);
+    const float * const d_b_val = (float*)mxGPUGetDataReadOnly(b_val);
 
-    int *d_a_row_csr = (int*)mxGPUGetDataReadOnly(a_row_csr);
-    int *d_b_row_csr = (int*)mxGPUGetDataReadOnly(b_row_csr);
-    int *d_c_row_csr = (int*)mxGPUGetDataReadOnly(c_row_csr);
+    const int * const d_a_row_csr = (int*)mxGPUGetDataReadOnly(a_row_csr);
+    const int * const d_b_row_csr = (int*)mxGPUGetDataReadOnly(b_row_csr);
+
+    int * d_c_row_csr = (int*)mxGPUGetData(c_row_csr);
 
     // Now we can access the arrays, we can do some checks
     int base;
@@ -126,14 +128,14 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     int nnz_check;
     cudaMemcpy(&nnz_check, d_a_row_csr+nrows, sizeof(int), cudaMemcpyDeviceToHost);
     nnz_check -= CUSPARSE_INDEX_BASE_ONE;
-    if (nnz_check != a_nnz) mxShowCriticalErrorMessage("A_ROW_CSR argument last element != nnz");
+    if (nnz_check != a_nnz) mxShowCriticalErrorMessage("A_ROW_CSR argument last element != nnz",nnz_check);
 
     cudaMemcpy(&base, d_b_row_csr, sizeof(int), cudaMemcpyDeviceToHost);
     if (base != CUSPARSE_INDEX_BASE_ONE) mxShowCriticalErrorMessage("B_ROW_CSR not using 1-based indexing");
 
     cudaMemcpy(&nnz_check, d_b_row_csr+nrows, sizeof(int), cudaMemcpyDeviceToHost);
     nnz_check -= CUSPARSE_INDEX_BASE_ONE;
-    if (nnz_check != b_nnz) mxShowCriticalErrorMessage("B_ROW_CSR argument last element != nnz");
+    if (nnz_check != b_nnz) mxShowCriticalErrorMessage("B_ROW_CSR argument last element != nnz",nnz_check);
 
     // Get sparsity pattern and nnz of output matrix
     int c_nnz;
@@ -149,9 +151,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     // Failure
     if (status1 != CUSPARSE_STATUS_SUCCESS)
     {
-	char message[128];
-	sprintf(message,"\nOperation cusparseXcsrgeamNnz failed with error code %i.",status1);
-	mxShowCriticalErrorMessage(message);
+	mxShowCriticalErrorMessage("Operation cusparseXcsrgeamNnz failed",status1);
     }
 
     if (NULL != nnzTotalDevHostPtr)
@@ -175,12 +175,12 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if (c_val==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
     // Convert from matlab pointers to native pointers
-    int *d_c_col = (int*)mxGPUGetDataReadOnly(c_col);
-    float *d_c_val = (float*)mxGPUGetDataReadOnly(c_val);
+    int *d_c_col = (int*)mxGPUGetData(c_col);
+    float *d_c_val = (float*)mxGPUGetData(c_val);
 
     // Addition here
-    float alpha = (float)mxGetScalar(ALPHA);
-    float beta = (float)mxGetScalar(BETA);
+    const float alpha = (float)mxGetScalar(ALPHA);
+    const float beta = (float)mxGetScalar(BETA);
 
     cusparseStatus_t status2 =
     cusparseScsrgeam(cusparseHandle, nrows, ncols,
@@ -205,6 +205,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     }
 
     // Clean up
+    cusparseDestroyMatDescr(descr);
     cusparseDestroy(cusparseHandle);
     cublasDestroy(cublasHandle);
     mxGPUDestroyGPUArray(a_row_csr);
@@ -220,9 +221,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     // Failure
     if (status2 != CUSPARSE_STATUS_SUCCESS)
     {
-	char message[128];
-	sprintf(message,"\nOperation cusparseScsrgeam failed with error code %i",status2);
-	mxShowCriticalErrorMessage(message);
+	mxShowCriticalErrorMessage("Operation cusparseScsrgeam failed",status2);
     }
 
     return;

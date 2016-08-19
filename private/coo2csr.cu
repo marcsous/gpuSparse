@@ -16,10 +16,6 @@
 #include <cusparse.h>
 #include <cublas_v2.h>
 
-// Utilities and system includes
-#include <helper_functions.h>  // helper for shared functions common to CUDA Samples
-#include <helper_cuda.h>       // helper function CUDA error checking and initialization
-
 // MATLAB related
 #include "mex.h"
 #include "gpu/mxGPUArray.h"
@@ -35,8 +31,8 @@
 void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 {
     // Checks
-    if (nlhs > 1) mxShowCriticalErrorMessage("wrong number of output arguments");
-    if (nrhs != 2) mxShowCriticalErrorMessage("wrong number of input arguments");
+    if (nlhs > 1) mxShowCriticalErrorMessage("wrong number of output arguments",nlhs);
+    if (nrhs != 2) mxShowCriticalErrorMessage("wrong number of input arguments",nrhs);
 
     // Initialize the MathWorks GPU API
     mxInitGPU();
@@ -45,9 +41,11 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     mxGPUArray const *row = mxGPUCreateFromMxArray(ROW);
 
     // Checks - note rows must be in COO (uncompressed) format
-    int nnz = mxGPUGetNumberOfElements(row);
-    int nrows = (int)mxGetScalar(NROWS);
+    if (!mxIsScalar(NROWS)) mxShowCriticalErrorMessage("NROWS argument must be a scalar");
     if (mxGPUGetClassID(row) != mxINT32_CLASS) mxShowCriticalErrorMessage("ROW argument is not int32");
+
+    int nrows = (int)mxGetScalar(NROWS);
+    int nnz = mxGPUGetNumberOfElements(row);
 
     // Create space for output vector
     const mwSize ndim = 1;
@@ -59,21 +57,21 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     cublasHandle_t cublasHandle = 0;
     cublasStatus_t cublasStatus;
     cublasStatus = cublasCreate(&cublasHandle);
-    checkCudaErrors(cublasStatus);
+    if (cublasStatus != CUBLAS_STATUS_SUCCESS) mxShowCriticalErrorMessage(cublasStatus);
 
     // Get handle to the CUSPARSE context
     cusparseHandle_t cusparseHandle = 0;
     cusparseStatus_t cusparseStatus;
     cusparseStatus = cusparseCreate(&cusparseHandle);
-    checkCudaErrors(cusparseStatus);
+    if (cusparseStatus != CUSPARSE_STATUS_SUCCESS) mxShowCriticalErrorMessage(cusparseStatus);
     cusparseMatDescr_t descr = 0;
     cusparseStatus = cusparseCreateMatDescr(&descr);
-    checkCudaErrors(cusparseStatus);
+    if (cusparseStatus != CUSPARSE_STATUS_SUCCESS) mxShowCriticalErrorMessage(cusparseStatus);
     cusparseSetMatType(descr,CUSPARSE_MATRIX_TYPE_GENERAL);
     cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
 
     // Convert from matlab pointers to native pointers 
-    int *d_row = (int*)mxGPUGetDataReadOnly(row);
+    const int * const d_row = (int*)mxGPUGetDataReadOnly(row);
     int *d_row_csr = (int*)mxGPUGetData(row_csr);
     char message[128] = {'\0'};
     int *buffer = NULL;
@@ -83,22 +81,14 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     {
 	buffer = (int *)mxMalloc((nrows+1)*sizeof(int));
 	if (buffer == NULL) mxShowCriticalErrorMessage("mxMalloc failed");
-
     	for (int j=0; j<nrows+1; j++) buffer[j] = CUSPARSE_INDEX_BASE_ONE;
-
-	cudaError_t status =
- 	cudaMemcpy((void *)d_row_csr, buffer, (nrows+1)*sizeof(int), cudaMemcpyHostToDevice);
-
-	if (status != cudaSuccess)
-	    sprintf(message,"\nOperation cudaMemcpy failed with error code %i",status);
+	cudaError_t status = cudaMemcpy((void *)d_row_csr, buffer, (nrows+1)*sizeof(int), cudaMemcpyHostToDevice);
+	if (status != cudaSuccess) sprintf(message,"\nOperation cudaMemcpy failed with error code %i",status);
     }
     else
     {
-    	cusparseStatus_t status =
-    	cusparseXcoo2csr(cusparseHandle, d_row, nnz, nrows, d_row_csr, CUSPARSE_INDEX_BASE_ONE);
-    
-	if (status != CUSPARSE_STATUS_SUCCESS)
-	    sprintf(message,"\nOperation cusparseXcoo2csr failed with error code %i",status);
+    	cusparseStatus_t status = cusparseXcoo2csr(cusparseHandle, d_row, nnz, nrows, d_row_csr, CUSPARSE_INDEX_BASE_ONE);
+    	if (status != CUSPARSE_STATUS_SUCCESS) sprintf(message,"\nOperation cusparseXcoo2csr failed with error code %i",status);
     }
 
 
@@ -112,6 +102,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     }
 
     // Clean up
+    cusparseDestroyMatDescr(descr);
     cusparseDestroy(cusparseHandle);
     cublasDestroy(cublasHandle);
     mxGPUDestroyGPUArray(row);
