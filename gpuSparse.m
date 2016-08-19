@@ -3,7 +3,8 @@ classdef gpuSparse
     % Sparse GPU array class (mex wrappers to cuSPARSE).
     % Tested on MATLAB R2016a and CUDA 7.5 only.
     % Arguments are the same as matlab's sparse function.
-    % Works fastest when row/col are already sorted.
+    % The nzmax argument is mainly intended to be able to
+    % check before creation, gpuSparse([],[],[],nrows,ncols,nzmax)
     %
     % Usage: A = gpuSparse(row,col,val,nrows,ncols,nzmax)
     %
@@ -26,9 +27,8 @@ classdef gpuSparse
     end
     
     % TO DO (with CUDA > 7.5 and Matlab > R2016a)
-    % 1) Revisit sort_row_only
-    % 2) Revisit use_gpu_csr2csc
-    % 3) Mixed real/complex operations
+    % 1) Revisit use_gpu_csr2csc
+    % 2) Mixed real/complex operations
     
     %%
     methods
@@ -69,51 +69,27 @@ classdef gpuSparse
                 error('Wrong number of arguments.');
             end
             
-            % validate arguments - slow to check if integer but adds flexibility
+            % validate arguments
             if numel(row)~=numel(val); error('row and val size mismatch.'); end
             if numel(col)~=numel(val); error('col and val size mismatch.'); end
+            
+            val = reshape(val,[],1);
+            row = reshape(row,[],1);
+            col = reshape(col,[],1);
             
             validateattributes(val,{'numeric','gpuArray'},{},'','val');
             validateattributes(row,{'numeric','gpuArray'},{'integer'},'','row');
             validateattributes(col,{'numeric','gpuArray'},{'integer'},'','col');
-            
-            % put in required format
-            val = single(val(:));
-            col = int32(col(:));
-            row = int32(row(:)); % still in COO format
-            
-            % row and probably col should be sorted for COO to CSR conversion
-            % 1) sorted row is definitely needed
-            % 2) within each row, col is 'presumed to be ascending' (https://people.sc.fsu.edu/~jburkardt/data/cr/cr.html)
-            % 3) everything seems to work without the col sort
-            % 4) issorted/sortrows with 2D array is not supported on gpu (R2016a)
-            sort_row_only = false;
 
-            if sort_row_only
-                if ~issorted(row)
-                    [row k] = sort(row);
-                    col = col(k);
-                    val = val(k);
-                end
-            else
-                rowcol = gather([row col]); % need to be on CPU for 2D sort
-                if ~issorted(rowcol,'rows')
-                    [rowcol k] = sortrows(rowcol);
-                    row(:) = rowcol(:,1);
-                    col(:) = rowcol(:,2);
-                    val = val(k);
-                end
-            end
-            
-            % check lower bounds and get default values for matrix size
-            if numel(row) > 0
-                if row(1)<1; error('All row indices must be greater than zero.'); end
+            % check bounds and get default values for matrix dims
+            if numel(val)>0
+                A.nrows = gather(max(row)); % set.nrows will catch int32 saturation
+                A.ncols = gather(max(col)); % set.ncols will catch int32 saturation
+                if min(row)<1; error('All row indices must be greater than zero.'); end
                 if min(col)<1; error('All col indices must be greater than zero.'); end
-                A.nrows = gather(row(end)); % still in COO format, sorted ascending
-                A.ncols = gather(max(col));
             end
 
-            % check and apply user-supplied sizes
+            % check and apply user-supplied matrix dims
             if exist('nrows','var')
                 nrows = gather(nrows);
                 validateattributes(nrows,{'numeric'},{'scalar','integer','>=',A.nrows},'','nrows');
@@ -125,39 +101,49 @@ classdef gpuSparse
                 A.ncols = ncols;
             end
             
-            % check upper bounds
-            if A.nrows==intmax('int32')
-                error('Number of rows equals or exceeds int32 range (%i).',intmax('int32'))
-            end
-            if A.ncols==intmax('int32')
-                error('Number of columns equals or exceeds int32 range (%i).',intmax('int32'))
-            end
-            
-            % estimate memory required to create matrix
+            % simple memory check
             info = gpuDevice();
             AvailableMemory = info.AvailableMemory / 1E9;
             if ~exist('nzmax','var')
                 nzmax = numel(val);
             else
                 nzmax = gather(nzmax);
-                validateattributes(nzmax,{'numeric'},{'scalar','integer'},'','nzmax');
-                nzmax = max(double(nzmax),numel(val)); % double to prevent overflow
+                validateattributes(nzmax,{'numeric'},{'scalar','positive'},'','nzmax');
+                nzmax = max(double(nzmax),numel(val));
             end
             RequiredMemory = 4*double(A.nrows+1)/1E9;
-            if ~isa(val,'gpuArray'); RequiredMemory = RequiredMemory+4*nzmax/1E9; end
-            if ~isa(col,'gpuArray'); RequiredMemory = RequiredMemory+4*nzmax/1E9; end
+            RequiredMemory = RequiredMemory+4*nzmax/1E9;
+            RequiredMemory = RequiredMemory+4*nzmax/1E9;
             if RequiredMemory > AvailableMemory
                 error('Not enough memory (%.1fGb required, %.1fGb available).',RequiredMemory,AvailableMemory);
             end
             
-            % convert row from COO to CSR format
-            A.row = coo2csr(row,A.nrows);
-            A.col = gpuArray(col);
-            A.val = gpuArray(val);
+            % cast to required class
+            val = single(val);
+            row = int32(row);
+            col = int32(col);
+            
+            % sort row and col for COO to CSR conversion
+            [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
+            
+            % convert from COO to CSR
+            A.row = coo2csr(A.row,A.nrows);
 
         end
         
-        % enforce class properties
+        % enforce some class properties - do inexpensive checks
+        function A = set.nrows(A,nrows)
+            if nrows < 0 || nrows==intmax('int32')
+                error('Property nrows must be between 0 and %i.',intmax('int32')-1)
+            end
+            A.nrows = nrows;
+        end
+        function A = set.ncols(A,ncols)
+            if ncols < 0 || ncols==intmax('int32')
+                error('Property ncols must be between 0 and %i.',intmax('int32')-1)
+            end
+            A.ncols = ncols;
+        end
         function A = set.row(A,row)
             if ~iscolumn(row) || ~isequal(classUnderlying(row),'int32')
                 error('Property row must be a column vector of int32s.')
@@ -206,13 +192,13 @@ classdef gpuSparse
             if numel(A.col) ~= numel(A.val); error(message); end
             if numel(A.row) ~= A.nrows+1; error(message); end
             if A.transp~=0 && A.transp~=1 && A.transp~=2; error(message); end
-            if numel(A.row) > 0
+            if numel(A.val)>0
                 if A.row(1) ~= 1; error(message); end
                 if A.row(end) ~= numel(A.val)+1; error(message); end
             end
             
             % slow checks
-            if numel(A.row) > 0
+            if numel(A.val) > 0
                 if min(A.col) < 1; error(message); end
                 if max(A.col) > A.ncols; error(message); end
                 rowcol = gather([csr2coo(A.row,A.nrows) A.col]);
@@ -270,7 +256,6 @@ classdef gpuSparse
             end
             validateattributes(a,{'numeric'},{'real','scalar','finite'},'','a');
             validateattributes(b,{'numeric'},{'real','scalar','finite'},'','b');
-            [m n] = size(A);
             if A.transp
                 [n m] = size(A);
             else
@@ -428,7 +413,7 @@ classdef gpuSparse
         % overload sum: only A and dim args are supported
         function retval = sum(A,dim,varargin)
             if nargin==1; dim = 1; end
-            validateattributes(dim,{'numeric'},{'integer','nonzero'},'','dim')
+            validateattributes(dim,{'numeric'},{'integer','positive'},'','dim')
             if dim==1; retval = (A' * ones(size(A,1),1,'single','gpuArray'))'; end
             if dim==2; retval = A * ones(size(A,2),1,'single','gpuArray'); end
             if dim>2; retval = A; end
@@ -497,11 +482,10 @@ classdef gpuSparse
 
         % overload norm
         function retval = norm(A,p);
-            if nargin<2; p = 2; end
-            if isequal(p,1)
+            if nargin<2 || isequal(p,2)
+                error('gpuSparse norm(A,2) is not available.');
+            elseif isequal(p,1)
                 retval = max(sum(abs(A),1));
-            elseif isequal(p,2)
-                error('gpuSparse norm(S,2) is not available.');
             elseif isequal(p,Inf)
                 retval = max(sum(abs(A),2));
             elseif isequal(p,'fro');
@@ -545,7 +529,7 @@ classdef gpuSparse
             if nargin>1; error('only 1 input argument supported'); end
             if nargout>3; error('too many ouput arguments'); end
             
-            % COO format on the CPU
+            % COO format on CPU
             i = gather(csr2coo(A.row,A.nrows));
             j = gather(A.col);
             v = gather(A.val);
