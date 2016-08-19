@@ -146,11 +146,11 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     }
     else
     {
-    	const cuComplex alpha = make_cuComplex(1.0, 0.0);
-	const cuComplex beta = make_cuComplex(0.0, 0.0);
-	cuComplex *d_y = (cuComplex*)mxGPUGetData(y);
-    	const cuComplex * const d_val = (cuComplex*)mxGPUGetDataReadOnly(val);
-    	const cuComplex * const d_x = (cuComplex*)mxGPUGetDataReadOnly(x);
+    	const cuFloatComplex alpha = make_cuFloatComplex(1.0, 0.0);
+	const cuFloatComplex beta = make_cuFloatComplex(0.0, 0.0);
+	cuFloatComplex *d_y = (cuFloatComplex*)mxGPUGetData(y);
+    	const cuFloatComplex * const d_val = (cuFloatComplex*)mxGPUGetDataReadOnly(val);
+    	const cuFloatComplex * const d_x = (cuFloatComplex*)mxGPUGetDataReadOnly(x);
 #if CUDART_VERSION < 8000
 	cusparseStatus = cusparseCcsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
 #else

@@ -121,8 +121,8 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     }
     else
     {
-    	const cuComplex * const d_val = (cuComplex*)mxGPUGetDataReadOnly(val);
-    	cuComplex *d_val_csc = (cuComplex*)mxGPUGetData(val_csc);
+    	const cuFloatComplex * const d_val = (cuFloatComplex*)mxGPUGetDataReadOnly(val);
+    	cuFloatComplex *d_val_csc = (cuFloatComplex*)mxGPUGetData(val_csc);
 	status = cusparseCcsr2csc(cusparseHandle, nrows, ncols, nnz, d_val, d_row_csr, d_col, d_val_csc, d_row, d_col_csc, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ONE);
     }
 
