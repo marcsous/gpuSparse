@@ -146,8 +146,8 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     }
     else
     {
-    	const cuComplex alpha = make_float2(1.0, 0.0);
-	const cuComplex beta = make_float2(0.0, 0.0);
+    	const cuComplex alpha = make_cuComplex(1.0, 0.0);
+	const cuComplex beta = make_cuComplex(0.0, 0.0);
 	cuComplex *d_y = (cuComplex*)mxGPUGetData(y);
     	const cuComplex * const d_val = (cuComplex*)mxGPUGetDataReadOnly(val);
     	const cuComplex * const d_x = (cuComplex*)mxGPUGetDataReadOnly(x);
