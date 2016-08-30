@@ -14,7 +14,7 @@ classdef gpuSparse
         nrows @ int32 scalar = 0; % number of rows
         ncols @ int32 scalar = 0; % number of columns
         
-        row @ gpuArray = zeros(0,1,'int32','gpuArray'); % row index (CSR format)
+        row @ gpuArray = ones(1,1,'int32','gpuArray'); % row index (CSR format)
         col @ gpuArray = zeros(0,1,'int32','gpuArray'); % column index
         val @ gpuArray = zeros(0,1,'single','gpuArray'); % nonzero values
         
@@ -186,17 +186,17 @@ classdef gpuSparse
             if ~isequal(classUnderlying(A.val),'single'); error(message); end
             if A.nrows < 0; error(message); end
             if A.ncols < 0; error(message); end
+            if A.nrows == intmax('int32'); error(message); end
+            if A.ncols == intmax('int32'); error(message); end
             if ~iscolumn(A.row); error(message); end
             if ~iscolumn(A.col); error(message); end
             if ~iscolumn(A.val); error(message); end
             if numel(A.col) ~= numel(A.val); error(message); end
             if numel(A.row) ~= A.nrows+1; error(message); end
+            if A.row(1) ~= 1; error(message); end
+            if A.row(end) ~= numel(A.val)+1; error(message); end
             if A.transp~=0 && A.transp~=1 && A.transp~=2; error(message); end
-            if numel(A.val)>0
-                if A.row(1) ~= 1; error(message); end
-                if A.row(end) ~= numel(A.val)+1; error(message); end
-            end
-            
+
             % slow checks
             if numel(A.val) > 0
                 if min(A.col) < 1; error(message); end
