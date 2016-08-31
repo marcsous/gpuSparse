@@ -2,7 +2,7 @@
 
 % checks
 if ~exist('/usr/local/cuda','dir')
-    warning('/usr/local/cuda directory not found. Make sure libraries are on the path or use "ln -s /usr/local/cuda-7.5 /usr/local/cuda" to create a link.')
+    warning('/usr/local/cuda directory not found. Try:\n%s','"sudo ln -s /usr/local/cuda-7.5 /usr/local/cuda"')
 end
 
 % clean
@@ -17,17 +17,17 @@ delete coosortByRow.mex*
 delete csrsort.mex*
 
 % make
-mexcuda csrgeam.cu -v -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
-mexcuda csrmv.cu -v -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
-mexcuda coo2csr.cu -v -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
-mexcuda csr2csc.cu -v -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
-mexcuda csr2csc_cpu.cu -v -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
-mexcuda csrmm.cu -v -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
-mexcuda csr2coo.cu -v -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
-mexcuda coosortByRow.cu -v -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
+mexcuda csrgeam.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
+mexcuda csrmv.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
+mexcuda coo2csr.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
+mexcuda csr2csc.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
+mexcuda csr2csc_cpu.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
+mexcuda csrmm.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
+mexcuda csr2coo.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
+mexcuda coosortByRow.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
 
 % not used but might as well compile it
-mexcuda csrsort.cu -v -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
+mexcuda csrsort.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
 
 % try with cuda 8: doesn't work with Matlab 2016a
 if false
