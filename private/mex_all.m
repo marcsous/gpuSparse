@@ -1,5 +1,10 @@
 % tested on Linux 64-bit with Matlab R2016a and CUDA 7.5
 
+% checks
+if ~exist('/usr/local/cuda','dir')
+    warning('/usr/local/cuda directory not found. Make sure libraries are on the path or use "ln -s /usr/local/cuda-7.5 /usr/local/cuda" to create a link.')
+end
+
 % clean
 delete csrgeam.mex*
 delete csrmv.mex*
