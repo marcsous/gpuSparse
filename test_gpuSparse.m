@@ -1,5 +1,6 @@
 % test gpuSparse class
 clear all
+reset(gpuDevice(1))
 
 M = 121401;
 N = 113331;
@@ -19,7 +20,7 @@ fprintf('Sorted index conversion to gpuSparse: ')
 [i j v] = find(A);
 tic; 
 b = gpuSparse(i,j,v,M,N); validate(b)
-fprintf('errors = (%i %i %i). ',any(a.row~=b.row),any(a.col~=b.col),any(a.val~=b.val))
+fprintf('errors = [%i %i %i]. ',any(a.row~=b.row),any(a.col~=b.col),any(a.val~=b.val))
 toc
 
 fprintf('Unsorted index conversion to gpuSparse: ')
@@ -29,11 +30,58 @@ j = j(k);
 v = v(k);
 tic; 
 b = gpuSparse(i,j,v,M,N); validate(b)
-fprintf('errors = (%i %i %i). ',any(a.row~=b.row),any(a.col~=b.col),any(a.val~=b.val))
+fprintf('errors = [%i %i %i]. ',any(a.row~=b.row),any(a.col~=b.col),any(a.val~=b.val))
 toc
 
 x = randn(N,1);
 y = randn(M,1);
+
+
+%% Expected failues (bounds etc)
+disp('---CATCH ERRORS---')
+
+try; gpuSparse('test'); disp('failed'); end
+try; gpuSparse(rand(3,3,3)); disp('failed'); end
+try; gpuSparse(1,-1); disp('failed'); end
+try; gpuSparse(-1,1); disp('failed'); end
+try; gpuSparse(1,Inf); disp('failed'); end
+try; gpuSparse(1,NaN); disp('failed'); end
+try; gpuSparse(Inf,1); disp('failed'); end
+try; gpuSparse(NaN,1); disp('failed'); end
+try; gpuSparse(intmax('int32'),1); disp('failed'); end
+try; gpuSparse(1,intmax('int32')); disp('failed'); end
+try; gpuSparse(1,-1,0); disp('failed'); end
+try; gpuSparse(-1,1,0); disp('failed'); end
+try; gpuSparse(1,Inf,0); disp('failed'); end
+try; gpuSparse(1,NaN,0); disp('failed'); end
+try; gpuSparse(Inf,1,0); disp('failed'); end
+try; gpuSparse(NaN,1,0); disp('failed'); end
+try; gpuSparse(intmax('int32'),1,0); disp('failed'); end
+try; gpuSparse(1,intmax('int32'),0); disp('failed'); end
+try; gpuSparse(1,1,'test'); disp('failed'); end
+try; gpuSparse(1:2,1:1,1:2); disp('failed'); end
+try; gpuSparse(1:1,1:2,1:2); disp('failed'); end
+try; gpuSparse(1:2,1:2,1:1); disp('failed'); end
+try; gpuSparse(1:1,1:1,1:2); disp('failed'); end
+try; gpuSparse(1,1,1,10,0); disp('failed'); end
+try; gpuSparse(1,1,1,0,10); disp('failed'); end
+try; gpuSparse(1,1,1,10,intmax('int32')); disp('failed'); end
+try; gpuSparse(1,1,1,intmax('int32'),10); disp('failed'); end
+try; gpuSparse(1,1,10,10,'test'); disp('failed'); end
+try; gpuSparse(1,1,10,'test',10); disp('failed'); end
+try; gpuSparse(10,10,1,10,9); disp('failed'); end
+try; gpuSparse(10,10,1,9,10); disp('failed'); end
+try; gpuSparse(10,10,1,10,10,-1); disp('failed'); end
+try; gpuSparse(10,10,1,10,10,Inf); disp('failed'); end
+try; gpuSparse(1.5,1,1,10,10,1); disp('failed'); end
+try; gpuSparse(1,1.5,1,10,10,1); disp('failed'); end
+try; gpuSparse(1,1,1,10.5,10,1); disp('failed'); end
+try; gpuSparse(1,1,1,10,10.5,1); disp('failed'); end
+try; gpuSparse(1,1,1,10,10,1.5); disp('failed'); end
+try; gpuSparse(1,1,1,10:11,10,1); disp('failed'); end
+try; gpuSparse(1,1,1,10,10:11,1); disp('failed'); end
+try; gpuSparse(1,1,1,10,10,1:2); disp('failed'); end
+
 
 %% accuracy
 disp('---ACCURACY---')
@@ -115,12 +163,24 @@ disp(norm(A,1) - norm(a,1))
 disp(norm(A,inf) - norm(a,inf))
 disp(norm(A,'fro') - norm(a,'fro'))
 
-disp('full_transpose')
+disp('full_transpose(a)')
 at = full_transpose(a); validate(at);
 disp(norm(sparse(at)-A.',inf))
-disp('full_ctranspose')
+disp('full_ctranspose(a)')
 at = full_ctranspose(a); validate(at);
 disp(norm(sparse(at)-A',inf))
+disp('full_transpose(a.'')')
+att = full_transpose(a.'); validate(att);
+disp(norm(sparse(att)-(A.').',inf))
+disp('full_transpose(a'')')
+att = full_transpose(a'); validate(att);
+disp(norm(sparse(att)-(A').',inf))
+disp('full_ctranspose(a.'')')
+att = full_ctranspose(a.'); validate(att);
+disp(norm(sparse(att)-(A.')',inf))
+disp('full_ctranspose(a'')')
+att = full_ctranspose(a'); validate(att);
+disp(norm(sparse(att)-(A')',inf))
 
 disp('find')
 [i j v] = find(A); [i2 j2 v2] = find(a);
