@@ -73,7 +73,7 @@ classdef gpuSparse
             validateattributes(val,{'numeric','gpuArray'},{},'','val');
 
             if numel(row)~=numel(val); error('row and val size mismatch (%i vs %i).',numel(row),numel(val)); end
-            if numel(col)~=numel(val); error('col / val size mismatch (%i / %i).',numel(col),numel(val)); end
+            if numel(col)~=numel(val); error('col and val size mismatch (%i vs %i).',numel(col),numel(val)); end
             
             val = reshape(val,[],1);
             row = reshape(row,[],1);
