@@ -16,8 +16,9 @@ delete csr2coo.mex*
 delete coosortByRow.mex*
 delete csrsort.mex*
 
-% make
-mexcuda csrgeam.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
+%% default mexcuda (cuda 7.5)
+
+mexcuda csrgeam.cu -v -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
 mexcuda csrmv.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
 mexcuda coo2csr.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
 mexcuda csr2csc.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
@@ -29,32 +30,45 @@ mexcuda coosortByRow.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAG
 % not used but might as well compile it
 mexcuda csrsort.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
 
-% try with cuda 8: doesn't work with Matlab 2016a
+
+%% cuda 8: csrmv.cu (cusparseScsrmv_mp) doesn't work
 if false
     
-    delete csrmv_v8.mex*
+    files = {'csrgeam','csrmv','coo2csr','csr2csc','csr2csc_cpu','csrmm','csr2coo','coosortByRow','csrsort'};
     
-    cmd = ['/usr/local/cuda-8.0/bin/nvcc -c --compiler-options=-D_GNU_SOURCE,-DMATLAB_MEX_FILE' ...
-           ' -I"/usr/local/cuda-8.0/include"' ...
-           ' -I"/usr/local/MATLAB/R2016a/extern/include"' ...
-           ' -I"/usr/local/MATLAB/R2016a/simulink/include"' ...
-           ' -I"/usr/local/MATLAB/R2016a/toolbox/distcomp/gpu/extern/include/"' ...
-           ' -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_30,code=sm_30 -gencode=arch=compute_50,code=\"sm_50,compute_50\"' ...
-           ' -std=c++11 --compiler-options=-ansi,-fexceptions,-fPIC,-fno-omit-frame-pointer,-pthread -O -DNDEBUG' ...
-           ' csrmv.cu -o csrmv_v8.o'];
-    system(cmd)
-    
-    cmd = ['/usr/bin/g++ -pthread -Wl,--no-undefined  -Wl,--no-as-needed -shared -O' ...
-           ' -Wl,--version-script,"/usr/local/MATLAB/R2016a/extern/lib/glnxa64/mexFunction.map"' ...
-           ' csrmv_v8.o   -ldl  -lcusparse  -lcublas_static  -lcusparse_static  -lculibos' ...
-           ' -L/usr/local/cuda-8.0/lib64 -Wl,-rpath-link,/usr/local/MATLAB/R2016a/bin/glnxa64' ...
-           ' -L"/usr/local/MATLAB/R2016a/bin/glnxa64" -lmx -lmex -lmat -lm -lstdc++ -lmwgpu' ...
-           ' -lcudart -o csrmv_v8.mexa64']; %' /usr/local/MATLAB/R2016a/bin/glnxa64/libcudart.so.7.5 -o csrmv_v8.mexa64'];
-    system(cmd)
-    
-    cmd = 'rm -f csrmv_v8.o';
-    system(cmd)
+    for k = 1:numel(files)
 
+        cmd1 = ['/usr/local/cuda-8.0/bin/nvcc -c --compiler-options=-D_GNU_SOURCE,-DMATLAB_MEX_FILE' ...
+               ' -I"/usr/local/cuda-8.0/include"' ...
+               ' -I"/usr/local/MATLAB/R2016a/extern/include"' ...
+               ' -I"/usr/local/MATLAB/R2016a/simulink/include"' ...
+               ' -I"/usr/local/MATLAB/R2016a/toolbox/distcomp/gpu/extern/include/"' ...
+               ' -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_50,code=sm_50' ...
+               ' -std=c++11 --compiler-options=-ansi,-fexceptions,-fPIC,-fno-omit-frame-pointer,-pthread -O -DNDEBUG' ...
+               ' ' files{k} '.cu -o ' files{k} '.o'];
+        
+        cmd2 = ['/usr/bin/g++ -pthread -Wl,--no-undefined -Wl,--no-as-needed -shared -O' ...
+               ' -Wl,--version-script,"/usr/local/MATLAB/R2016a/extern/lib/glnxa64/mexFunction.map"' ...
+               ' ' strcat(files{k},'.o') ' -ldl' ... 
+               ' /usr/local/cuda-8.0/targets/x86_64-linux/lib/libcusparse.so' ... % -lcusparse
+               ' /usr/local/cuda-8.0/targets/x86_64-linux/lib/libcublas_static.a' ... % -lcublas_static
+               ' /usr/local/cuda-8.0/targets/x86_64-linux/lib/libcusparse_static.a' ... % -lcusparse_static
+               ' /usr/local/cuda-8.0/targets/x86_64-linux/lib/libculibos.a' ... % -lculibos'
+               ' -L/usr/local/cuda-8.0/lib64 -Wl,-rpath-link,/usr/local/MATLAB/R2016a/bin/glnxa64' ...
+               ' -L"/usr/local/MATLAB/R2016a/bin/glnxa64" -lmx -lmex -lmat -lm -lstdc++ -lmwgpu' ...
+               ' /usr/local/cuda-8.0/targets/x86_64-linux/lib/libcudart.so' ... % /usr/local/MATLAB/R2016a/bin/glnxa64/libcudart.so.7.5 
+               ' -o ' files{k} '.mexa64'];
+        
+        cmd3 = ['rm -f ' files{k} '.o'];
+
+        disp([files{k} '.cu'])
+        if system(cmd1); error('%s failed step 1',files{k}); end
+        if system(cmd2); error('%s failed step 2',files{k}); end
+        if system(cmd3); error('%s failed step 3',files{k}); end
+        disp('MEX completed successfully.')
+        
+    end
+    
 end
 
 
