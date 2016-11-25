@@ -296,7 +296,7 @@ classdef gpuSparse
         function retval = sum(A,dim,varargin)
             if nargin==1; dim = 1; end
             validateattributes(dim,{'numeric'},{'integer','positive'},'','dim')
-            if dim==1; retval = A' * ones(size(A,1),1,'single','gpuArray')'; end
+            if dim==1; retval =(A'* ones(size(A,1),1,'single','gpuArray'))'; end
             if dim==2; retval = A * ones(size(A,2),1,'single','gpuArray'); end
             if dim>2; retval = A; end
         end
