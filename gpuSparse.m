@@ -16,14 +16,14 @@ classdef gpuSparse
     % 3) Mixed real/complex operations
     
     %%
-    properties (SetAccess=immutable)
+    properties (SetAccess = immutable)
         
         nrows @ int32 scalar; % number of rows
         ncols @ int32 scalar; % number of columns
         
     end
     
-    properties (SetAccess=protected)
+    properties (SetAccess = private)
         
         row @ gpuArray; % int32 row index (CSR format)
         col @ gpuArray; % int32 column index
@@ -207,14 +207,14 @@ classdef gpuSparse
         function B = real(A);
             B = A;
             B.val = real(A.val);
-            %B = remove_zeros(B);
+            %B = drop_zeros(B);
         end
         
         % imag
         function B = imag(A);
             B = A;
             B.val = imag(A.val);
-            %B = remove_zeros(B);
+            %B = drop_zeros(B);
         end
         
         % abs
@@ -296,7 +296,7 @@ classdef gpuSparse
         function retval = sum(A,dim,varargin)
             if nargin==1; dim = 1; end
             validateattributes(dim,{'numeric'},{'integer','positive'},'','dim')
-            if dim==1; retval = (A' * ones(size(A,1),1,'single','gpuArray'))'; end
+            if dim==1; retval = A' * ones(size(A,1),1,'single','gpuArray')'; end
             if dim==2; retval = A * ones(size(A,2),1,'single','gpuArray'); end
             if dim>2; retval = A; end
         end
@@ -371,7 +371,7 @@ classdef gpuSparse
             end
         end
         
-        % find: not efficient, for debugging
+        % find: returns indices on the GPU (not efficient, mainly for debugging)
         function varargout = find(A)
             if nargin>1; error('only 1 input argument supported'); end
             if nargout>3; error('too many ouput arguments'); end
@@ -455,7 +455,7 @@ classdef gpuSparse
                 error('Argument x is empty.')
             elseif ~isnumeric(x)
                 error('Argument x must be numeric (%s not supported).',class(x))
-            elseif isscalar(x)
+            elseif isscalar(x) && ~iscolumn(A)
                 y = A;
                 y.val = y.val * x;
             elseif isvector(x)
@@ -559,7 +559,7 @@ classdef gpuSparse
         end
 
         % remove zeros from sparse matrix
-        function A = remove_zeros(A)
+        function A = drop_zeros(A)
             nonzeros = (A.val ~= 0);
             if ~all(nonzeros)
                 A.row = csr2coo(A.row,A.nrows);
@@ -570,14 +570,14 @@ classdef gpuSparse
             end
         end
 
-        % sparse (returns sparse matrix on CPU): not efficient, for debugging
+        % sparse: returns sparse matrix on GPU (not efficient, mainly for debugging)
         function A_sp = sparse(A)
             [m n] = size(A);
             [i j v] = find(A);
             A_sp = sparse(i,j,double(v),m,n);
         end
         
-        % full (returns full matrix on CPU): not efficient, for debugging
+        % full: returns full matrix on GPU (not efficient, mainly for debugging)
         function A_f = full(A)
             A_sp = sparse(A);
             A_f = cast(full(A_sp),classUnderlying(A));
