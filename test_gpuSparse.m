@@ -220,20 +220,20 @@ y = gather(y);
 x = double(x);
 y = double(y);
 
-tic; fprintf('A*x  (native)   : ')
+tic; fprintf('A*x  (sparse)   : ')
 for k = 1:10
     z = A*x; wait(gpuDevice);
 end
 toc;
 
 AT = A';
-tic; fprintf('AT*y (native)   : ')
+tic; fprintf('AT*y (sparse)   : ')
 for k = 1:10
     z = AT*y; wait(gpuDevice);
 end
 toc;
 
-tic; fprintf('A''*y (native)   : ')
+tic; fprintf('A''*y (sparse)   : ')
 for k = 1:10
     z = A'*y; wait(gpuDevice);
 end
