@@ -124,8 +124,21 @@ classdef gpuSparse
             row = int32(row);
             col = int32(col);
             
-            % sort row and col for COO to CSR conversion
-            [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
+            % attempt to recompile mex files if there is an error
+            try
+                
+                % sort row and col for COO to CSR conversion
+                [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
+                
+            catch ME
+                
+                warning('%s Attempting to recompile mex files...',ME.message);
+                mex_all;
+                
+                % try mex function again
+                [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
+
+            end
             
             % convert from COO to CSR
             A.row = coo2csr(A.row,A.nrows);
