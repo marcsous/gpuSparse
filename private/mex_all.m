@@ -1,9 +1,27 @@
+function mex_all()
 % tested on Linux 64-bit with Matlab R2016a and CUDA 7.5
 
 % checks
 if ~exist('/usr/local/cuda','dir')
     warning('/usr/local/cuda directory not found. Try:\n%s','"sudo ln -s /usr/local/cuda-7.5 /usr/local/cuda"')
 end
+
+% need to be in the current directory for mexcuda
+oldpath = pwd;
+newpath = fileparts(mfilename('fullpath'));
+cd(newpath);
+
+% if the mexcuda fails, we are stuck - rethrow error
+try
+    mex_all_compile();
+    cd(oldpath)
+catch ME
+    cd(oldpath)
+    rethrow(ME)
+end
+
+
+function mex_all_compile()
 
 % clean
 delete csrgeam.mex*
@@ -18,7 +36,7 @@ delete csrsort.mex*
 
 %% default mexcuda (cuda 7.5)
 
-mexcuda csrgeam.cu -v -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
+mexcuda csrgeam.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
 mexcuda csrmv.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
 mexcuda coo2csr.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
 mexcuda csr2csc.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
@@ -27,8 +45,8 @@ mexcuda csrmm.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LD
 mexcuda csr2coo.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
 mexcuda coosortByRow.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
 
-% not used but might as well compile it
-mexcuda csrsort.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
+% not used any more
+%mexcuda csrsort.cu -I/usr/local/cuda/include -L/usr/local/cuda/lib64 LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas_static -lcusparse_static -lculibos
 
 
 %% cuda 8: csrmv.cu (cusparseScsrmv_mp) doesn't work
