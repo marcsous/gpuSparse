@@ -12,9 +12,9 @@ classdef gpuSparse
 
     % TO DO
     % 1) Test with CUDA 8 and Matlab > R2016a
-    % 2) Revisit csr2csc on gpu
-    % 3) Mixed real/complex operations
-    
+    % 2) Revisit csr2csc on gpu with CUDA 8
+    % 3) Native mixed real/complex operations
+
     %%
     properties (SetAccess = immutable)
         
@@ -27,13 +27,12 @@ classdef gpuSparse
         
         row @ gpuArray; % int32 row index (CSR format)
         col @ gpuArray; % int32 column index
-        val @ gpuArray; % single nonzero values
-        
-        trnsp @ int32 scalar; % lazy transpose flag
-        % 0 == CUSPARSE_OPERATION_NON_TRANSPOSE
-        % 1 == CUSPARSE_OPERATION_TRANSPOSE
-        % 2 == CUSPARSE_OPERATION_CONJUGATE_TRANSPOSE
+        val @ gpuArray; % single precision values
 
+        trans @ int32 scalar; % lazy transpose flag (passed to cuSPARSE)
+                              % 0 = CUSPARSE_OPERATION_NON_TRANSPOSE
+                              % 1 = CUSPARSE_OPERATION_TRANSPOSE
+                              % 2 = CUSPARSE_OPERATION_CONJUGATE_TRANSPOSE
     end
     
     %%
@@ -47,16 +46,16 @@ classdef gpuSparse
                 row = []; col = []; val = [];
             end
 
-            % convert argument to gpuSparse format ("row" is the first argument)
+            % expect a matrix, return gpuSparse ("row" is the first argument)
             if nargin==1
-                if isa(row,'gpuSparse'); A = row; return; end
+                if isa(row,'gpuSparse'); A = row; return; end % return unchanged
                 if ~isnumeric(row); error('Cannot convert ''%s'' to gpuSparse.',class(row)); end
                 if ~ismatrix(row); error('Cannot convert ND array to gpuSparse.'); end
                 [nrows ncols] = size(row);
                 [row col val] = find(row);
             end
 
-            % create empty m x n matrix
+            % empty m x n matrix
             if nargin==2
                 nrows = row; ncols = col;
                 row = []; col = []; val = [];
@@ -67,20 +66,26 @@ classdef gpuSparse
                 error('Wrong number of arguments.');
             end
 
-            % validate arguments
+            % validate argument types
             validateattributes(row,{'numeric','gpuArray'},{'integer'},'','row');
             validateattributes(col,{'numeric','gpuArray'},{'integer'},'','col');
             validateattributes(val,{'numeric','gpuArray'},{},'','val');
 
-            if numel(row)~=numel(val); error('row and val size mismatch (%i vs %i).',numel(row),numel(val)); end
-            if numel(col)~=numel(val); error('col and val size mismatch (%i vs %i).',numel(col),numel(val)); end
-            
-            val = reshape(val,[],1);
+            % check vector lengths
             row = reshape(row,[],1);
             col = reshape(col,[],1);
+            val = reshape(val,[],1);            
+            if numel(row)~=numel(col)
+                error('Vectors must be the same length (row=%i col=%i).',numel(row),numel(col));
+            end
+            if numel(val)==1
+                val = repmat(val,numel(row),1);
+            elseif numel(val)~=numel(row)
+                error('Vectors must be the same length (row=%i val=%i).',numel(row),numel(val));
+            end
 
             % check bounds of indices
-            if numel(val) > 0
+            if numel(row) > 0
                 A.nrows = gather(max(row));
                 if min(row)<1 || A.nrows==intmax('int32')
                     error('row indices must be between 1 and %i.',intmax('int32')-1);
@@ -103,7 +108,7 @@ classdef gpuSparse
                 A.ncols = ncols;
             end
 
-            % simple memory check
+            % simple memory check - needs work
             info = gpuDevice();
             AvailableMemory = info.AvailableMemory / 1E9;
             if ~exist('nzmax','var')
@@ -120,22 +125,19 @@ classdef gpuSparse
             end
 
             % cast to required class
-            val = single(val);
             row = int32(row);
             col = int32(col);
-            
-            % attempt to recompile mex files if there is an error
+            val = single(val);
+
+            % sort row and col for COO to CSR conversion - attempt to recompile mex files if there's an error
             try
-                
-                % sort row and col for COO to CSR conversion
+
                 [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
                 
             catch ME
                 
                 warning('%s Attempting to recompile mex files...',ME.message);
                 mex_all;
-                
-                % try mex function again
                 [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
 
             end
@@ -164,11 +166,11 @@ classdef gpuSparse
             end
             A.val = val;
         end
-        function A = set.trnsp(A,trnsp)
-            if trnsp~=0 && trnsp~=1 && trnsp~=2
-                error('Property trnsp must be 0, 1 or 2.')
+        function A = set.trans(A,trans)
+            if trans~=0 && trans~=1 && trans~=2
+                error('Property trans must be 0, 1 or 2.')
             end
-            A.trnsp = trnsp;
+            A.trans = trans;
         end
 
         %% validation - helpful for testing
@@ -179,7 +181,7 @@ classdef gpuSparse
             % fast checks
             if ~isa(A.nrows,'int32'); error(message); end
             if ~isa(A.ncols,'int32'); error(message); end
-            if ~isa(A.trnsp,'int32'); error(message); end
+            if ~isa(A.trans,'int32'); error(message); end
             if ~isa(A.row,'gpuArray'); error(message); end
             if ~isa(A.col,'gpuArray'); error(message);end
             if ~isa(A.val,'gpuArray'); error(message); end
@@ -197,7 +199,7 @@ classdef gpuSparse
             if numel(A.row) ~= A.nrows+1; error(message); end
             if A.row(1) ~= 1; error(message); end
             if A.row(end) ~= numel(A.val)+1; error(message); end
-            if A.trnsp~=0 && A.trnsp~=1 && A.trnsp~=2; error(message); end
+            if A.trans~=0 && A.trans~=1 && A.trans~=2; error(message); end
 
             % slow checks
             if numel(A.val) > 0
@@ -294,38 +296,50 @@ classdef gpuSparse
         
         % nonzeros
         function val = nonzeros(A)
-            if A.trnsp==0
+            if A.trans==0
                 [~,~,val] = find(A);
-                val = gpuArray(val);
             else
                 val = nonzeros(A.val);
-                if A.trnsp==2
+                if A.trans==2
                     val = conj(A.val);
                 end
             end
         end
 
-        % sum: only A and dim args are supported
-        function retval = sum(A,dim,varargin)
-            if nargin==1; dim = 1; end
-            validateattributes(dim,{'numeric'},{'integer','positive'},'','dim')
-            if dim==1; retval =(A'* ones(size(A,1),1,'single','gpuArray'))'; end
-            if dim==2; retval = A * ones(size(A,2),1,'single','gpuArray'); end
-            if dim>2; retval = A; end
+        % sum: only A and DIM args are supported
+        function retval = sum(A,DIM)
+            if nargin==1
+                DIM = 1;
+            else
+                validateattributes(DIM,{'numeric'},{'integer','positive'},'','DIM')
+            end
+            if numel(A)==0
+                retval = sum(zeros(size(A)),DIM);
+                retval = gpuSparse(retval);
+            else
+                if DIM==1; retval =(A'* ones(size(A,1),1,'single','gpuArray'))'; end
+                if DIM==2; retval = A * ones(size(A,2),1,'single','gpuArray'); end
+                if DIM>2; retval = A; end
+            end
         end
         
-        % norm
+        % norm: support same types as sparse
         function retval = norm(A,p);
-            if nargin<2 || isequal(p,2)
-                error('gpuSparse norm(A,2) is not available.');
-            elseif isequal(p,1)
-                retval = max(sum(abs(A),1));
-            elseif isequal(p,Inf)
-                retval = max(sum(abs(A),2));
-            elseif isequal(p,'fro');
-                retval = norm(A.val);
+            if nargin<2; p = 2; end
+            if isvector(A)
+                retval = norm(A.val,p);
             else
-                error('The only matrix norms available are 1, 2, inf, and ''fro''.');
+                if isequal(p,2)
+                    error('gpuSparse norm(A,2) is not available.');
+                elseif isequal(p,1)
+                    retval = max(sum(abs(A),1));
+                elseif isequal(p,Inf)
+                    retval = max(sum(abs(A),2));
+                elseif isequal(p,'fro');
+                    retval = norm(A.val);
+                else
+                    error('The only matrix norms available are 1, 2, inf, and ''fro''.');
+                end
             end
         end
         
@@ -334,7 +348,7 @@ classdef gpuSparse
             if nargin ~= 3 || ~isempty(Y) || ~isequal(DIM,2)
                 error('Only 3 argument form supported: max(A,[],2).');
             end
-            if A.trnsp
+            if A.trans
                 error('Transpose max not supported - try full_transpose(A).')
             end
             
@@ -352,8 +366,8 @@ classdef gpuSparse
         end
         
         % size
-        function varargout = size(A,dim)
-            if A.trnsp==0
+        function varargout = size(A,DIM)
+            if A.trans==0
                 m = double(A.nrows);
                 n = double(A.ncols);
             else
@@ -364,9 +378,9 @@ classdef gpuSparse
                 if nargout>1
                     error('too many output arguments.');
                 end
-                if dim==1
+                if DIM==1
                     varargout{1} = m;
-                elseif dim==2
+                elseif DIM==2
                     varargout{1} = n;
                 else
                     varargout{1} = 1;
@@ -389,21 +403,19 @@ classdef gpuSparse
             if nargin>1; error('only 1 input argument supported'); end
             if nargout>3; error('too many ouput arguments'); end
             
-            % COO format on CPU
-            i = gather(csr2coo(A.row,A.nrows));
-            j = gather(A.col);
-            v = gather(A.val);
-            
+            % COO format on GPU
+            i = csr2coo(A.row,A.nrows);
+            j = A.col;
+            v = A.val;
+
             % remove explicit zeros
-            nonzeros = (v ~= 0);
-            if ~all(nonzeros)
-                i = i(nonzeros);
-                j = j(nonzeros);
-                v = v(nonzeros);
-            end
-            
+            nz = (v ~= 0);
+            i = i(nz);
+            j = j(nz);
+            v = v(nz);
+
             % MATLAB style, double precision, sorted columns
-            if A.trnsp
+            if A.trans
                 [i j] = deal(j,i);
             else
                 [~,k] = sortrows([j i]);
@@ -420,9 +432,9 @@ classdef gpuSparse
                 varargout{2} = j;
             end
             if nargout==3
-                if A.trnsp==0; varargout{3} = v(k); end
-                if A.trnsp==1; varargout{3} = v; end
-                if A.trnsp==2; varargout{3} = conj(v); end
+                if A.trans==0; varargout{3} = v(k); end
+                if A.trans==1; varargout{3} = v; end
+                if A.trans==2; varargout{3} = conj(v); end
             end
         end
         
@@ -447,18 +459,18 @@ classdef gpuSparse
             if ~isreal(A) || ~isreal(B)
                 error('Complex addition not supported at the moment.')
             end
-            if A.trnsp ~= B.trnsp
+            if A.trans ~= B.trans
                 error('Matrix lazy transpose not fully supported. Use full_transpose.')
             end
             validateattributes(a,{'numeric'},{'real','scalar','finite'},'','a');
             validateattributes(b,{'numeric'},{'real','scalar','finite'},'','b');
-            if A.trnsp
+            if A.trans
                 [n m] = size(A);
             else
                 [m n] = size(A);
             end
             C = gpuSparse(m,n);
-            C.trnsp = A.trnsp;
+            C.trans = A.trans;
             [C.row C.col C.val] = csrgeam(A.row,A.col,A.val,m,n,B.row,B.col,B.val,a,b);
         end
         
@@ -473,12 +485,12 @@ classdef gpuSparse
                 y.val = y.val * x;
             elseif isvector(x)
                 if isreal(A) == isreal(x)
-                    y = csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.trnsp,x);
+                    y = csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,x);
                 elseif isreal(A)
-                    y = complex(csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.trnsp,real(x)), ...
-                                csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.trnsp,imag(x)));
+                    y = complex(csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,real(x)), ...
+                                csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,imag(x)));
                 elseif isreal(x)
-                    y = csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.trnsp,complex(x));
+                    y = csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,complex(x));
                 else
                     error('Should never get here.')
                 end
@@ -487,10 +499,10 @@ classdef gpuSparse
                     error('Complex A not supported at the moment.')
                 end
                 if isreal(x)
-                    y = csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.trnsp,x);
+                    y = csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,x);
                 else
-                    y = complex(csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.trnsp,real(x)), ...
-                                csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.trnsp,imag(x)));
+                    y = complex(csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,real(x)), ...
+                                csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,imag(x)));
                 end
             else
                 error('Argument x has too many dimensions.')
@@ -513,10 +525,10 @@ classdef gpuSparse
         
         % full transpose: A.'
         function A_t = full_transpose(A)
-            if A.trnsp
+            if A.trans
                 A_t = A;
-                A_t.trnsp = 0;
-                if A.trnsp==2 && ~isreal(A)
+                A_t.trans = 0;
+                if A.trans==2 && ~isreal(A)
                     A_t.val = conj(A_t.val);
                 end
             else
@@ -540,13 +552,13 @@ classdef gpuSparse
         
         % full ctranspose: A'
         function A_t = full_ctranspose(A)
-            if A.trnsp
+            if A.trans
                 A_t = A;
-                A_t.trnsp = 0;
+                A_t.trans = 0;
             else
                 A_t = full_transpose(A);
             end
-            if A.trnsp~=2 && ~isreal(A)
+            if A.trans~=2 && ~isreal(A)
                 A_t.val = conj(A_t.val);
             end
         end
@@ -554,20 +566,20 @@ classdef gpuSparse
         % lazy transpose (flag): A.'
         function A_t = transpose(A)
             A_t = A; % lazy copy
-            switch A.trnsp
-                case 0; A_t.trnsp = 1;
-                case 1; A_t.trnsp = 0;
-                case 2; A_t.trnsp = 0; A_t.val = conj(A_t.val);
+            switch A.trans
+                case 0; A_t.trans = 1;
+                case 1; A_t.trans = 0;
+                case 2; A_t.trans = 0; A_t.val = conj(A_t.val);
             end
         end
         
         % lazy transpose (flag): A'
         function A_t = ctranspose(A)
             A_t = A; % lazy copy
-            switch A_t.trnsp
-                case 0; if isreal(A_t); A_t.trnsp = 1; else A_t.trnsp = 2; end
-                case 1; A_t.trnsp = 0; if ~isreal(A_t); A_t.val = conj(A_t.val); end
-                case 2; A_t.trnsp = 0;
+            switch A_t.trans
+                case 0; if isreal(A_t); A_t.trans = 1; else A_t.trans = 2; end
+                case 1; A_t.trans = 0; if ~isreal(A_t); A_t.val = conj(A_t.val); end
+                case 2; A_t.trans = 0;
             end
         end
 
