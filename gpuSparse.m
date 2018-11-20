@@ -608,6 +608,14 @@ classdef gpuSparse
             A_f = cast(full(A_sp),classUnderlying(A));
         end
         
+        % subsref/assgn not implemented - hard
+        function A = subsasgn(A,s,b)
+            error('Not implemented.');
+        end
+        function b = subsref(A,s)
+            error('Not implemented.');
+        end
+        
     end
     
 end
