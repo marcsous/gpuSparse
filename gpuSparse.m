@@ -3,15 +3,13 @@ classdef gpuSparse
     % Sparse GPU array class (mex wrappers to cuSPARSE)
     % using int32 indices and single precision values.
     %
-    % Arguments are the same as matlab's sparse function.
+    % Usage: A = gpuSparse(row,col,val,nrows,ncols,nzmax)    
     %
-    % If supplied, nzmax is used to check memory before
-    % creation: gpuSparse([],[],[],nrows,ncols,nzmax)
+    % The nzmax argument can be used to check sufficient
+    % memory: gpuSparse([],[],[],nrows,ncols,nzmax)
     %
-    % Usage: A = gpuSparse(row,col,val,nrows,ncols,nzmax)
-
     % TO DO
-    % 1) Test with CUDA 8 and Matlab > R2016a
+    % 1) Test with CUDA 8 and Matlab > R2016a: done
     % 2) Revisit csr2csc on gpu with CUDA 8
     % 3) Native mixed real/complex operations
 
@@ -78,10 +76,12 @@ classdef gpuSparse
             if numel(row)~=numel(col)
                 error('Vectors must be the same length (row=%i col=%i).',numel(row),numel(col));
             end
-            if numel(val)==1
-                val = repmat(val,numel(row),1);
-            elseif numel(val)~=numel(row)
-                error('Vectors must be the same length (row=%i val=%i).',numel(row),numel(val));
+            if numel(val)~=numel(row)
+                if numel(val)==1
+                    val = repmat(val,numel(row),1);
+                else
+                    error('Vectors must be the same length (row=%i val=%i).',numel(row),numel(val));
+                end
             end
 
             % check bounds of indices
@@ -131,15 +131,11 @@ classdef gpuSparse
 
             % sort row and col for COO to CSR conversion - attempt to recompile mex files if there's an error
             try
-
                 [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
-                
             catch ME
-                
                 warning('%s Attempting to recompile mex files...',ME.message);
                 mex_all;
                 [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
-
             end
             
             % convert from COO to CSR
@@ -272,11 +268,6 @@ classdef gpuSparse
             retval = nnz(A.val);
         end
         
-        % numel
-        function retval = numel(A)
-            retval = prod(size(A));
-        end
-        
         % length
         function retval = length(A)
             retval = max(size(A));
@@ -378,7 +369,9 @@ classdef gpuSparse
                 if nargout>1
                     error('too many output arguments.');
                 end
-                if DIM==1
+                if ~isscalar(DIM) || DIM<=0 || mod(DIM,1)
+                    error('Dimension argument must be a positive integer scalar.')
+                elseif DIM==1
                     varargout{1} = m;
                 elseif DIM==2
                     varargout{1} = n;
@@ -460,7 +453,7 @@ classdef gpuSparse
                 error('Complex addition not supported at the moment.')
             end
             if A.trans ~= B.trans
-                error('Matrix lazy transpose not fully supported. Use full_transpose.')
+                error('Matrix addition with lazy transpose not fully supported.')
             end
             validateattributes(a,{'numeric'},{'real','scalar','finite'},'','a');
             validateattributes(b,{'numeric'},{'real','scalar','finite'},'','b');
@@ -513,7 +506,7 @@ classdef gpuSparse
         function y = times(A,x)
             if isempty(x)
                 error('Argument x is empty.')
-            elseif ~isnumeric(x)
+            elseif ~isnumeric(x) && ~islogical(x)
                 error('Argument x must be numeric (%s not supported).',class(x))
             elseif isscalar(x)
                 y = A;
@@ -523,63 +516,71 @@ classdef gpuSparse
             end
         end
         
+        % divide: A ./ x
+        function y = rdivide(A,x)
+            if ~isa(A,'gpuSparse')
+                error('Division by gpuSparse array not supported.');
+            end
+            y = times(A,1./x);
+        end
+        
         % full transpose: A.'
-        function A_t = full_transpose(A)
+        function AT = full_transpose(A)
             if A.trans
-                A_t = A;
-                A_t.trans = 0;
-                if A.trans==2 && ~isreal(A)
-                    A_t.val = conj(A_t.val);
+                AT = A;
+                AT.trans = 0;
+                if ~isreal(A) && A.trans==2
+                    AT.val = conj(AT.val);
                 end
             else
                 [m n] = size(A);
-                A_t = gpuSparse([],[],[],n,m,nnz(A));
+                AT = gpuSparse([],[],[],n,m,nnz(A));
                 
-                % cuSPARSE version uses excessive memory, prefer CPU version
-                if false
-                    [A_t.col A_t.row A_t.val] = csr2csc(A.row,A.col,A.val,m,n);
+                % csr2csc uses excessive memory in early versions (OK in cuda 10.1)
+                if true
+                    [AT.col AT.row AT.val] = csr2csc(A.row,A.col,A.val,m,n);
                 else
                     row = gather(A.row);
                     col = gather(A.col);
                     val = gather(A.val);
-                    [col row val] = csr2csc_cpu(row,col,val,m,n);
-                    A_t.col = gpuArray(col);
-                    A_t.row = gpuArray(row);
-                    A_t.val = gpuArray(val);
+                    [col row val] = csr2csc_cpu(row,col,val,m,n); % cpu version
+                    AT.col = gpuArray(col);
+                    AT.row = gpuArray(row);
+                    AT.val = gpuArray(val);
                 end
             end
         end
         
         % full ctranspose: A'
-        function A_t = full_ctranspose(A)
+        function AT = full_ctranspose(A)
             if A.trans
-                A_t = A;
-                A_t.trans = 0;
+                AT = A;
+                AT.trans = 0;
             else
-                A_t = full_transpose(A);
+                AT = full_transpose(A);
             end
-            if A.trans~=2 && ~isreal(A)
-                A_t.val = conj(A_t.val);
+            if ~isreal(A) && A.trans~=2
+                AT.val = conj(AT.val);
             end
         end
 
         % lazy transpose (flag): A.'
-        function A_t = transpose(A)
-            A_t = A; % lazy copy
+        function AT = transpose(A)
+            AT = A; % lazy copy
             switch A.trans
-                case 0; A_t.trans = 1;
-                case 1; A_t.trans = 0;
-                case 2; A_t.trans = 0; A_t.val = conj(A_t.val);
+                case 0; AT.trans = 1;
+                case 1; AT.trans = 0;
+                case 2; AT.trans = 0; AT.val = conj(AT.val);
             end
         end
         
         % lazy transpose (flag): A'
-        function A_t = ctranspose(A)
-            A_t = A; % lazy copy
-            switch A_t.trans
-                case 0; if isreal(A_t); A_t.trans = 1; else A_t.trans = 2; end
-                case 1; A_t.trans = 0; if ~isreal(A_t); A_t.val = conj(A_t.val); end
-                case 2; A_t.trans = 0;
+        function AT = ctranspose(A)
+            AT = A; % lazy copy
+            switch A.trans
+                case 0; if isreal(A); AT.trans = 1; else AT.trans = 2; end
+                case 1; AT.trans = 0; if ~isreal(A); AT.val = conj(AT.val); end
+                case 2; AT.trans = 0;
             end
         end
 
@@ -608,14 +609,32 @@ classdef gpuSparse
             A_f = cast(full(A_sp),classUnderlying(A));
         end
         
-        % subsref/assgn not implemented - hard
-        function A = subsasgn(A,s,b)
-            error('Not implemented.');
+        % numel is tricky - should it be 1 or prod(size(A))?
+        function retval = numel(A)
+            retval = prod(size(A)); % breaks subsref . indexing
+            retval = 1; % works but not what we expect for a matrix
         end
-        function b = subsref(A,s)
-            error('Not implemented.');
+
+        % the following are hard - don't implement
+        function retval = subsref(A,s)
+            if isequal(s.type,'.')
+                retval = A.(s.subs);
+            else
+                error('subsref not implemented.');
+            end
+        end        
+        function retval = subsasgn(A,s,b)
+            error('subsasgn not implemented.');
+        end
+        function varargout = cat(varargin)
+            error('cat not implemented.');
+        end
+        function varargout = horzcat(varargin)
+            error('horzcat not implemented.');
+        end
+        function varargout = vertcat(varargin)
+            error('vertcat not implemented.');
         end
         
     end
-    
 end
