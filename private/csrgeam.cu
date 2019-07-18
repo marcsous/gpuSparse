@@ -68,8 +68,8 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     int a_nnz = mxGPUGetNumberOfElements(a_val);
     int b_nnz = mxGPUGetNumberOfElements(b_val);
 
-    int nrows = (int)mxGetScalar(NROWS);
-    int ncols = (int)mxGetScalar(NCOLS);
+    mwSize nrows = mxGetScalar(NROWS);
+    mwSize ncols = mxGetScalar(NCOLS);
 
     if (mxGPUGetNumberOfElements(a_row_csr) != nrows+1) mxShowCriticalErrorMessage("A_ROW_CSR argument wrong size",mxGPUGetNumberOfElements(a_row_csr));
     if (mxGPUGetNumberOfElements(a_col) != a_nnz) mxShowCriticalErrorMessage("A_COL argument wrong size",mxGPUGetNumberOfElements(a_col));

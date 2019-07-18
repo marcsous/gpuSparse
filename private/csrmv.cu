@@ -58,9 +58,9 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     mxGPUArray const *x = mxGPUCreateFromMxArray(X);
 
     // Check sizes - note rows are in CSR (compressed row) format
-    int nnz = mxGPUGetNumberOfElements(val);
-    int nrows = (int)mxGetScalar(NROWS);
-    int ncols = (int)mxGetScalar(NCOLS);
+    mwSize nnz = mxGPUGetNumberOfElements(val);
+    mwSize nrows = mxGetScalar(NROWS);
+    mwSize ncols = mxGetScalar(NCOLS);
 
     mwSize *xdims = (mwSize*)mxGPUGetDimensions(x); // xdims always has >= 2 elements
     if (mxGPUGetNumberOfDimensions(x) > 2) mxShowCriticalErrorMessage("X argument has too many dimensions",mxGPUGetNumberOfDimensions(x));
@@ -138,11 +138,11 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 	float *d_y = (float*)mxGPUGetData(y);
     	const float * const d_val = (float*)mxGPUGetDataReadOnly(val);
     	const float * const d_x = (float*)mxGPUGetDataReadOnly(x);
-#if CUDART_VERSION < 8000
+//#if CUDART_VERSION < 8000
     	cusparseStatus = cusparseScsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
-#else
-    	cusparseStatus = cusparseScsrmv_mp(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
-#endif
+//#else
+//    	cusparseStatus = cusparseScsrmv_mp(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+//#endif
     }
     else
     {
@@ -151,11 +151,11 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 	cuFloatComplex *d_y = (cuFloatComplex*)mxGPUGetData(y);
     	const cuFloatComplex * const d_val = (cuFloatComplex*)mxGPUGetDataReadOnly(val);
     	const cuFloatComplex * const d_x = (cuFloatComplex*)mxGPUGetDataReadOnly(x);
-#if CUDART_VERSION < 8000
+//#if CUDART_VERSION < 8000
 	cusparseStatus = cusparseCcsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
-#else
-    	cusparseStatus = cusparseCcsrmv_mp(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
-#endif
+//#else
+//    	cusparseStatus = cusparseCcsrmv_mp(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+//#endif
     }
 
     if (cusparseStatus == CUSPARSE_STATUS_SUCCESS)
@@ -181,11 +181,11 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     // Failure
     if (cusparseStatus != CUSPARSE_STATUS_SUCCESS)
     {
-#if CUDART_VERSION < 8000
+//#if CUDART_VERSION < 8000
 	mxShowCriticalErrorMessage("Operation cusparseScsrmv or cusparseCcsrmv failed",cusparseStatus);
-#else
-	mxShowCriticalErrorMessage("Operation cusparseScsrmv_mp or cusparseCcsrmv_mp failed",cusparseStatus);
-#endif
+//#else
+//	mxShowCriticalErrorMessage("Operation cusparseScsrmv_mp or cusparseCcsrmv_mp failed",cusparseStatus);
+//#endif
     }
 
     return;

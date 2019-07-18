@@ -43,7 +43,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     // Checks - note rows must be in CSR format
     if (!mxIsScalar(NROWS)) mxShowCriticalErrorMessage("NROWS argument must be a scalar");
     if (mxGPUGetClassID(row_csr) != mxINT32_CLASS) mxShowCriticalErrorMessage("ROW_CSR argument is not int32");
-    int nrows = (int)mxGetScalar(NROWS);
+    mwSize nrows = mxGetScalar(NROWS);
     if (mxGPUGetNumberOfElements(row_csr) != nrows+1) mxShowCriticalErrorMessage("ROW_CSR argument is wrong size",mxGPUGetNumberOfElements(row_csr));
 
     // Get handle to the CUBLAS context
@@ -79,7 +79,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 
     // Create space for output vector
     const mwSize ndim = 1;
-    mwSize dims[ndim] = {nnz};
+    mwSize dims[ndim] = {(mwSize)nnz}; // we checked that nnz is >=0 so cast is safe
     mxGPUArray *row = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
     if (row==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 

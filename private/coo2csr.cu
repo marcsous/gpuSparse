@@ -44,8 +44,8 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if (!mxIsScalar(NROWS)) mxShowCriticalErrorMessage("NROWS argument must be a scalar");
     if (mxGPUGetClassID(row) != mxINT32_CLASS) mxShowCriticalErrorMessage("ROW argument is not int32");
 
-    int nrows = (int)mxGetScalar(NROWS);
-    int nnz = mxGPUGetNumberOfElements(row);
+    mwSize nrows = mxGetScalar(NROWS);
+    mwSize nnz = mxGPUGetNumberOfElements(row);
 
     // Create space for output vector
     const mwSize ndim = 1;

@@ -54,14 +54,14 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     mxGPUArray const *b = mxGPUCreateFromMxArray(B);
 
     // Check sizes of A - note rows are in CSR (compressed row) format
-    int nnz = mxGPUGetNumberOfElements(val);
+    mwSize nnz = mxGPUGetNumberOfElements(val);
 
     if (!mxIsScalar(NROWS)) mxShowCriticalErrorMessage("NROWS argument must be a scalar");
     if (!mxIsScalar(NCOLS)) mxShowCriticalErrorMessage("NCOLS argument must be a scalar");
     if (!mxIsScalar(TRANS)) mxShowCriticalErrorMessage("TRANS argument must be a scalar");
 
-    int m = (int)mxGetScalar(NROWS);
-    int k = (int)mxGetScalar(NCOLS);
+    mwSize m = mxGetScalar(NROWS);
+    mwSize k = mxGetScalar(NCOLS);
 
     if (mxGPUGetNumberOfElements(row_csr) != m+1) mxShowCriticalErrorMessage("ROW_CSR argument wrong size",mxGPUGetNumberOfElements(row_csr));
     if (mxGPUGetNumberOfElements(col) != nnz) mxShowCriticalErrorMessage("COL argument wrong size",mxGPUGetNumberOfElements(col));
@@ -70,8 +70,8 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if (mxGPUGetNumberOfDimensions(b) > 2) mxShowCriticalErrorMessage("B has too many dimensions",mxGPUGetNumberOfDimensions(b));
 
     mwSize *bdims = (mwSize*)mxGPUGetDimensions(b); // dims always has >= 2 elements
-    int ldb = bdims[0]; // leading dimension of B
-    int n = bdims[1];
+    mwSize ldb = bdims[0]; // leading dimension of B
+    mwSize n = bdims[1];
 
     cusparseOperation_t trans = (cusparseOperation_t)mxGetScalar(TRANS);
     if (trans == CUSPARSE_OPERATION_NON_TRANSPOSE)
