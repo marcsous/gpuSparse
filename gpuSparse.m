@@ -471,7 +471,7 @@ classdef gpuSparse
         function y = mtimes(A,x)
             if isempty(x)
                 error('Argument x is empty.')
-            elseif ~isnumeric(x)
+            elseif ~isnumeric(x) && ~islogical(x)
                 error('Argument x must be numeric (%s not supported).',class(x))
             elseif isscalar(x) && ~iscolumn(A)
                 y = A;
@@ -609,10 +609,13 @@ classdef gpuSparse
             A_f = cast(full(A_sp),classUnderlying(A));
         end
         
-        % numel is tricky - should it be 1 or prod(size(A))?
+        % numel - should it be 1 object or prod(size(A)) elements?
         function retval = numel(A)
-            retval = prod(size(A)); % breaks subsref . indexing
-            retval = 1; % works but not what we expect for a matrix
+            retval = prod(size(A));
+        end
+        % Mathworks suggested this to help fix . indexing
+        function retval = numArgumentsFromSubscript(A, s, ic)
+            retval = builtin('numArgumentsFromSubscript', A, s, ic);
         end
 
         % the following are hard - don't implement
