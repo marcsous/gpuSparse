@@ -7,30 +7,25 @@ classdef gpuSparse
     %
     % The nzmax argument can be used to check sufficient
     % memory: gpuSparse([],[],[],nrows,ncols,nzmax)
-    %
-    % TO DO
-    % 1) Test with CUDA 8 and Matlab > R2016a: done
-    % 2) Revisit csr2csc on gpu with CUDA 8
-    % 3) Native mixed real/complex operations
 
     %%
     properties (SetAccess = immutable)
         
-        nrows @ int32 scalar; % number of rows
-        ncols @ int32 scalar; % number of columns
+        nrows(1,1) int32 % number of rows
+        ncols(1,1) int32 % number of columns
         
     end
     
-    properties (SetAccess = private)
+    properties (SetAccess = private, Hidden = true)
         
-        row @ gpuArray; % int32 row index (CSR format)
-        col @ gpuArray; % int32 column index
-        val @ gpuArray; % single precision values
+        row(:,1) gpuArray % int32 row index (CSR format)
+        col(:,1) gpuArray % int32 column index
+        val(:,1) gpuArray % single precision values
+        trans(1,1) int32  % lazy transpose flag (passed to cuSPARSE)
+                          % 0 = CUSPARSE_OPERATION_NON_TRANSPOSE
+                          % 1 = CUSPARSE_OPERATION_TRANSPOSE
+                          % 2 = CUSPARSE_OPERATION_CONJUGATE_TRANSPOSE
 
-        trans @ int32 scalar; % lazy transpose flag (passed to cuSPARSE)
-                              % 0 = CUSPARSE_OPERATION_NON_TRANSPOSE
-                              % 1 = CUSPARSE_OPERATION_TRANSPOSE
-                              % 2 = CUSPARSE_OPERATION_CONJUGATE_TRANSPOSE
     end
     
     %%
