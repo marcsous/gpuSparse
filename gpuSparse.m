@@ -258,6 +258,36 @@ classdef gpuSparse
             str = classUnderlying(A.val);
         end
         
+        % gt (only support scalar)
+        function B = gt(A,tol);
+            if ~isscalar(tol)
+                error('Non-scalar argument not supported.');
+            end
+            B = A;
+            B.val = single(A.val > tol);
+            %B = drop_zeros(B);
+        end
+        
+        % lt (only support scalar)
+        function B = lt(A,tol);
+            if ~isscalar(tol)
+                error('Non-scalar argument not supported.');
+            end
+            B = A;
+            B.val = single(A.val < tol);
+            %B = drop_zeros(B);
+        end   
+        
+        % eq (only support scalar)
+        function B = eq(A,tol);
+            if ~isscalar(tol)
+                error('Non-scalar argument not supported.');
+            end
+            B = A;
+            B.val = single(A.val == tol);
+            %B = drop_zeros(B);
+        end  
+        
         % nnz
         function retval = nnz(A)
             retval = nnz(A.val);
@@ -531,8 +561,8 @@ classdef gpuSparse
                 [m n] = size(A);
                 AT = gpuSparse([],[],[],n,m,nnz(A));
                 
-                % csr2csc uses excessive memory in early versions (OK in cuda 10.1)
-                if true
+                % csr2csc uses excessive memory in early versions
+                if false
                     [AT.col AT.row AT.val] = csr2csc(A.row,A.col,A.val,m,n);
                 else
                     row = gather(A.row);
