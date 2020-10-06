@@ -67,14 +67,14 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     mwSize dims[ndim];
 
     dims[0] = nnz;
-    mxGPUArray *row_sort = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
+    mxGPUArray *row_sort = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_INITIALIZE_VALUES);
     if (row_sort==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
-    mxGPUArray *col_sort = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
+    mxGPUArray *col_sort = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_INITIALIZE_VALUES);
     if (col_sort==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
     mxComplexity ccx = mxGPUGetComplexity(val);
-    mxGPUArray *val_sort = mxGPUCreateGPUArray(ndim, dims, mxSINGLE_CLASS, ccx, MX_GPU_DO_NOT_INITIALIZE);
+    mxGPUArray *val_sort = mxGPUCreateGPUArray(ndim, dims, mxSINGLE_CLASS, ccx, MX_GPU_INITIALIZE_VALUES);
     if (val_sort==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
     // Get handle to the CUBLAS context
@@ -140,7 +140,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     	cudaStatus = cudaMalloc( &P, sizeof(int)*nnz);
     	if (cudaStatus != cudaSuccess) mxShowCriticalErrorMessage("Operation cudaMalloc failed",cudaStatus);
 
-	cusparseStatus = cusparseCreateIdentityPermutation(cusparseHandle, nnz, P);
+        cusparseStatus = cusparseCreateIdentityPermutation(cusparseHandle, nnz, P);
     	if (cusparseStatus != CUSPARSE_STATUS_SUCCESS) mxShowCriticalErrorMessage("Operation cusparseCreateIdentityPermutation failed",cusparseStatus);
 
     	// step 3: sort COO format by Row
@@ -152,14 +152,14 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     	{
     	    const float * const d_val = (float*)mxGPUGetDataReadOnly(val);
     	    float *d_val_sort = (float*)mxGPUGetData(val_sort);
-	    cusparseStatus = cusparseSgthr(cusparseHandle, nnz, d_val, d_val_sort, P, CUSPARSE_INDEX_BASE_ZERO); // MUST USE BASE_ZERO
-	}
-	else
-	{
+            cusparseStatus = cusparseSgthr(cusparseHandle, nnz, d_val, d_val_sort, P, CUSPARSE_INDEX_BASE_ZERO); // MUST USE BASE_ZERO
+        }
+        else
+        {
     	    const cuFloatComplex * const d_val = (cuFloatComplex*)mxGPUGetDataReadOnly(val);
     	    cuFloatComplex *d_val_sort = (cuFloatComplex*)mxGPUGetData(val_sort);
-	    cusparseStatus = cusparseCgthr(cusparseHandle, nnz, d_val, d_val_sort, P, CUSPARSE_INDEX_BASE_ZERO); // MUST USE BASE_ZERO
-	}
+            cusparseStatus = cusparseCgthr(cusparseHandle, nnz, d_val, d_val_sort, P, CUSPARSE_INDEX_BASE_ZERO); // MUST USE BASE_ZERO
+        }
     	if (cusparseStatus != CUSPARSE_STATUS_SUCCESS) mxShowCriticalErrorMessage("Operation cusparseSgthr or cusparseCgthr failed",cusparseStatus);
 
     }

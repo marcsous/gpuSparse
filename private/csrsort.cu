@@ -66,11 +66,11 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     mwSize dims[ndim];
 
     dims[0] = nnz;
-    mxGPUArray *col_sort = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
+    mxGPUArray *col_sort = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_INITIALIZE_VALUES);
     if (col_sort==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
     mxComplexity ccx = mxGPUGetComplexity(val);
-    mxGPUArray *val_sort = mxGPUCreateGPUArray(ndim, dims, mxSINGLE_CLASS, ccx, MX_GPU_DO_NOT_INITIALIZE);
+    mxGPUArray *val_sort = mxGPUCreateGPUArray(ndim, dims, mxSINGLE_CLASS, ccx, MX_GPU_INITIALIZE_VALUES);
     if (val_sort==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
     // Get handle to the CUBLAS context

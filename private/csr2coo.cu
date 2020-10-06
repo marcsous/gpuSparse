@@ -80,7 +80,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     // Create space for output vector
     const mwSize ndim = 1;
     mwSize dims[ndim] = {(mwSize)nnz}; // we checked that nnz is >=0 so cast is safe
-    mxGPUArray *row = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
+    mxGPUArray *row = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_INITIALIZE_VALUES);
     if (row==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
     // Convert from matlab pointers to native pointers 

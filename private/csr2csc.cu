@@ -15,7 +15,11 @@
 #include <cuda_runtime.h>
 #include <cusparse.h>
 #include <cublas_v2.h>
-
+        
+#if CUDART_VERSION >= 11000
+#include "wrappers_to_cuda_11.h"
+#endif  
+        
 // MATLAB related
 #include "mex.h"
 #include "gpu/mxGPUArray.h"
@@ -65,15 +69,15 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     mwSize dims[ndim];
 
     dims[0] = ncols+1;
-    mxGPUArray *col_csc = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
+    mxGPUArray *col_csc = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_INITIALIZE_VALUES);
     if (col_csc==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
     dims[0] = nnz;
-    mxGPUArray *row = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
+    mxGPUArray *row = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_INITIALIZE_VALUES);
     if (row==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
     mxComplexity ccx = mxGPUGetComplexity(val);
-    mxGPUArray *val_csc = mxGPUCreateGPUArray(ndim, dims, mxSINGLE_CLASS, ccx, MX_GPU_DO_NOT_INITIALIZE);
+    mxGPUArray *val_csc = mxGPUCreateGPUArray(ndim, dims, mxSINGLE_CLASS, ccx, MX_GPU_INITIALIZE_VALUES);
     if (val_csc==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
     // Get handle to the CUBLAS context
@@ -117,13 +121,21 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     {
     	const float * const d_val = (float*)mxGPUGetDataReadOnly(val);
     	float *d_val_csc = (float*)mxGPUGetData(val_csc);
-	status = cusparseScsr2csc(cusparseHandle, nrows, ncols, nnz, d_val, d_row_csr, d_col, d_val_csc, d_row, d_col_csc, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ONE);
+#if CUDART_VERSION >= 11000
+        status = cusparseXcsr2csc_wrapper(cusparseHandle, nrows, ncols, nnz, d_val, d_row_csr, d_col, d_val_csc, d_row, d_col_csc, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ONE);
+#else
+        status = cusparseScsr2csc(cusparseHandle, nrows, ncols, nnz, d_val, d_row_csr, d_col, d_val_csc, d_row, d_col_csc, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ONE);
+#endif
     }
     else
     {
     	const cuFloatComplex * const d_val = (cuFloatComplex*)mxGPUGetDataReadOnly(val);
     	cuFloatComplex *d_val_csc = (cuFloatComplex*)mxGPUGetData(val_csc);
-	status = cusparseCcsr2csc(cusparseHandle, nrows, ncols, nnz, d_val, d_row_csr, d_col, d_val_csc, d_row, d_col_csc, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ONE);
+#if CUDART_VERSION >= 11000
+        status = cusparseXcsr2csc_wrapper(cusparseHandle, nrows, ncols, nnz, d_val, d_row_csr, d_col, d_val_csc, d_row, d_col_csc, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ONE);
+#else
+        status = cusparseCcsr2csc(cusparseHandle, nrows, ncols, nnz, d_val, d_row_csr, d_col, d_val_csc, d_row, d_col_csc, CUSPARSE_ACTION_NUMERIC, CUSPARSE_INDEX_BASE_ONE);
+#endif
     }
 
     if (status == CUSPARSE_STATUS_SUCCESS)

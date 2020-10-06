@@ -16,6 +16,10 @@
 #include <cusparse.h>
 #include <cublas_v2.h>
 
+#if CUDART_VERSION >= 11000
+#include "wrappers_to_cuda_11.h"
+#endif
+        
 // MATLAB related
 #include "mex.h"
 #include "gpu/mxGPUArray.h"
@@ -96,7 +100,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     mwSize dims[ndim] = {trans == CUSPARSE_OPERATION_NON_TRANSPOSE ? nrows : ncols};
     mxClassID cid = mxGPUGetClassID(x);
     
-    mxGPUArray *y = mxGPUCreateGPUArray(ndim, dims, cid, ccx, MX_GPU_DO_NOT_INITIALIZE);
+    mxGPUArray *y = mxGPUCreateGPUArray(ndim, dims, cid, ccx, MX_GPU_INITIALIZE_VALUES);
     if (y==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed.");
 
     // Get handle to the CUBLAS context
@@ -117,8 +121,8 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
 
     // Convert from matlab pointers to native pointers
-    const int * const d_row_csr = (int*)mxGPUGetDataReadOnly(row_csr);
-    const int * const d_col = (int*)mxGPUGetDataReadOnly(col);
+    const int* const d_row_csr = (int*)mxGPUGetDataReadOnly(row_csr);
+    const int* const d_col = (int*)mxGPUGetDataReadOnly(col);
 
     // Now we can access the arrays, we can do some checks
     int base;
@@ -135,27 +139,27 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     {
     	const float alpha = 1.0;
     	const float beta = 0.0;
-	float *d_y = (float*)mxGPUGetData(y);
-    	const float * const d_val = (float*)mxGPUGetDataReadOnly(val);
-    	const float * const d_x = (float*)mxGPUGetDataReadOnly(x);
-//#if CUDART_VERSION < 8000
-    	cusparseStatus = cusparseScsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
-//#else
-//    	cusparseStatus = cusparseScsrmv_mp(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
-//#endif
+        float* d_y = (float*)mxGPUGetData(y);
+    	const float* const d_val = (float*)mxGPUGetDataReadOnly(val);
+    	const float* const d_x = (float*)mxGPUGetDataReadOnly(x);
+#if CUDART_VERSION >= 11000
+        cusparseStatus = cusparseXcsrmv_wrapper(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+#else
+        cusparseStatus = cusparseScsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+#endif
     }
     else
     {
     	const cuFloatComplex alpha = make_cuFloatComplex(1.0, 0.0);
-	const cuFloatComplex beta = make_cuFloatComplex(0.0, 0.0);
-	cuFloatComplex *d_y = (cuFloatComplex*)mxGPUGetData(y);
+        const cuFloatComplex beta = make_cuFloatComplex(0.0, 0.0);
+        cuFloatComplex *d_y = (cuFloatComplex*)mxGPUGetData(y);
     	const cuFloatComplex * const d_val = (cuFloatComplex*)mxGPUGetDataReadOnly(val);
     	const cuFloatComplex * const d_x = (cuFloatComplex*)mxGPUGetDataReadOnly(x);
-//#if CUDART_VERSION < 8000
-	cusparseStatus = cusparseCcsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
-//#else
-//    	cusparseStatus = cusparseCcsrmv_mp(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
-//#endif
+#if CUDART_VERSION >= 11000	
+        cusparseStatus = cusparseXcsrmv_wrapper(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+#else
+        cusparseStatus = cusparseCcsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+#endif
     }
 
     if (cusparseStatus == CUSPARSE_STATUS_SUCCESS)
@@ -165,6 +169,10 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 
     	// Make sure operations are finished before deleting
     	//cudaDeviceSynchronize();
+    }
+    else
+    {
+        mxShowCriticalErrorMessage("unknown failure",cusparseStatus);
     }
 
     // Clean up

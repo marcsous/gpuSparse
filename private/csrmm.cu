@@ -16,6 +16,10 @@
 #include <cusparse.h>
 #include <cublas_v2.h>
 
+#if CUDART_VERSION >= 11000
+#include "wrappers_to_cuda_11.h"
+#endif
+  
 // MATLAB related
 #include "mex.h"
 #include "gpu/mxGPUArray.h"
@@ -140,7 +144,11 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     const float alpha = 1.0;
     const float beta = 0.0;
 
+#if CUDART_VERSION >= 11000
+    cusparseStatus = cusparseXcsrmm_wrapper(cusparseHandle, trans, m, k, n, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c, ldc);
+#else
     cusparseStatus = cusparseScsrmm(cusparseHandle, trans, m, n, k, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c, ldc);
+#endif
 
     if (cusparseStatus == CUSPARSE_STATUS_SUCCESS)
     {
@@ -165,7 +173,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     // Failure
     if (cusparseStatus != CUSPARSE_STATUS_SUCCESS)
     {
-	mxShowCriticalErrorMessage("Operation cusparseScsrmm failed",cusparseStatus);
+        mxShowCriticalErrorMessage("Operation cusparseScsrmm failed",cusparseStatus);
     }
 
     return;

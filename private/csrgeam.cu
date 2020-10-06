@@ -16,6 +16,10 @@
 #include <cusparse.h>
 #include <cublas_v2.h>
 
+#if CUDART_VERSION >= 11000
+#include "wrappers_to_cuda_11.h"
+#endif    
+        
 // MATLAB related
 #include "mex.h"
 #include "gpu/mxGPUArray.h"
@@ -118,7 +122,12 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     const int * const d_a_row_csr = (int*)mxGPUGetDataReadOnly(a_row_csr);
     const int * const d_b_row_csr = (int*)mxGPUGetDataReadOnly(b_row_csr);
 
-    int * d_c_row_csr = (int*)mxGPUGetData(c_row_csr);
+    int *d_c_col = NULL;
+    float *d_c_val = NULL;
+    int *d_c_row_csr = (int*)mxGPUGetData(c_row_csr);
+
+    const float alpha = (float)mxGetScalar(ALPHA);
+    const float beta = (float)mxGetScalar(BETA);
 
     // Now we can access the arrays, we can do some checks
     int base;
@@ -142,28 +151,53 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     int *nnzTotalDevHostPtr = &c_nnz;
     cusparseSetPointerMode(cusparseHandle, CUSPARSE_POINTER_MODE_HOST);
 
+    char *buffer = NULL;            
+    size_t bufferSizeInBytes;
+
+#if CUDART_VERSION >= 11000
+    cusparseScsrgeam2_bufferSizeExt(cusparseHandle, nrows, ncols,
+        &alpha,
+        descr, a_nnz, d_a_val, d_a_row_csr, d_a_col,
+        &beta,
+        descr, b_nnz, d_b_val, d_b_row_csr, d_b_col,
+        descr,        d_c_val, d_c_row_csr, d_c_col,
+        &bufferSizeInBytes);
+
+    cudaError_t status0 = cudaMalloc((void**)&buffer, sizeof(char)*bufferSizeInBytes);
+    if (status0 != cudaSuccess)
+    {
+        mxShowCriticalErrorMessage("Operation cudaMalloc failed",status0);
+    }
+
+    cusparseStatus_t status1 =
+    cusparseXcsrgeam2Nnz(cusparseHandle, nrows, ncols,
+        	descr, a_nnz, d_a_row_csr, d_a_col,
+        	descr, b_nnz, d_b_row_csr, d_b_col,
+        	descr, d_c_row_csr, nnzTotalDevHostPtr, buffer);
+#else
     cusparseStatus_t status1 =
     cusparseXcsrgeamNnz(cusparseHandle, nrows, ncols,
         	descr, a_nnz, d_a_row_csr, d_a_col,
         	descr, b_nnz, d_b_row_csr, d_b_col,
         	descr, d_c_row_csr, nnzTotalDevHostPtr);
+#endif
 
     // Failure
     if (status1 != CUSPARSE_STATUS_SUCCESS)
     {
-	mxShowCriticalErrorMessage("Operation cusparseXcsrgeamNnz failed",status1);
+        mxShowCriticalErrorMessage("Operation cusparseXcsrgeamNnz failed",status1);
     }
 
     if (NULL != nnzTotalDevHostPtr)
     {
-	c_nnz = *nnzTotalDevHostPtr;
+        c_nnz = *nnzTotalDevHostPtr;
     }
     else
     {
     	int baseC = CUSPARSE_INDEX_BASE_ONE;
-	cudaMemcpy(&c_nnz, d_c_row_csr+nrows, sizeof(int), cudaMemcpyDeviceToHost);
-	cudaMemcpy(&baseC, c_row_csr, sizeof(int), cudaMemcpyDeviceToHost);
-	c_nnz -= baseC;
+        cudaMemcpy(&c_nnz, d_c_row_csr+nrows, sizeof(int), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&baseC, c_row_csr, sizeof(int), cudaMemcpyDeviceToHost);
+        c_nnz -= baseC;
     }
 
     // Allocate space for output vectors
@@ -175,13 +209,22 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if (c_val==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
     // Convert from matlab pointers to native pointers
-    int *d_c_col = (int*)mxGPUGetData(c_col);
-    float *d_c_val = (float*)mxGPUGetData(c_val);
+    d_c_col = (int*)mxGPUGetData(c_col);
+    d_c_val = (float*)mxGPUGetData(c_val);
 
     // Addition here
-    const float alpha = (float)mxGetScalar(ALPHA);
-    const float beta = (float)mxGetScalar(BETA);
-
+#if CUDART_VERSION >= 11000
+    cusparseStatus_t status2 =
+    cusparseScsrgeam2(cusparseHandle, nrows, ncols,
+	        &alpha,
+	        descr, a_nnz,
+	        d_a_val, d_a_row_csr, d_a_col,
+	        &beta,
+	        descr, b_nnz,
+	        d_b_val, d_b_row_csr, d_b_col,
+	        descr,
+	        d_c_val, d_c_row_csr, d_c_col, buffer);
+#else
     cusparseStatus_t status2 =
     cusparseScsrgeam(cusparseHandle, nrows, ncols,
 	        &alpha,
@@ -192,6 +235,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 	        d_b_val, d_b_row_csr, d_b_col,
 	        descr,
 	        d_c_val, d_c_row_csr, d_c_col);
+#endif
 
     if (status2 == CUSPARSE_STATUS_SUCCESS)
     {
@@ -208,6 +252,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     cusparseDestroyMatDescr(descr);
     cusparseDestroy(cusparseHandle);
     cublasDestroy(cublasHandle);
+    if(buffer) cudaFree(buffer);
     mxGPUDestroyGPUArray(a_row_csr);
     mxGPUDestroyGPUArray(a_col);
     mxGPUDestroyGPUArray(a_val);
