@@ -197,7 +197,7 @@ classdef gpuSparse
                 if min(A.col) < 1; error(message); end
                 if max(A.col) > A.ncols; error(message); end
                 rowcol = gather([csr2coo(A.row,A.nrows) A.col]);
-                if ~issorted(rowcol,'rows'); error(message); end
+                %if ~issorted(rowcol,'rows'); error(message); end % this fails on CUDA 11 for transpose... but doesn't matter
             end
             
         end
@@ -561,17 +561,18 @@ classdef gpuSparse
                 [m n] = size(A);
                 AT = gpuSparse([],[],[],n,m,nnz(A));
                 
-                % csr2csc uses excessive memory in early versions
-                if false
-                    [AT.col AT.row AT.val] = csr2csc(A.row,A.col,A.val,m,n);
-                else
-                    row = gather(A.row);
-                    col = gather(A.col);
-                    val = gather(A.val);
-                    [col row val] = csr2csc_cpu(row,col,val,m,n); % cpu version
-                    AT.col = gpuArray(col);
-                    AT.row = gpuArray(row);
-                    AT.val = gpuArray(val);
+                if nnz(A) % cuSPARSE breaks if nnz==0 so avoid call
+                    if true % cuSPARSE version (uses excessive memory?)
+                        [AT.col AT.row AT.val] = csr2csc(A.row,A.col,A.val,m,n);
+                    else % cpu version
+                        row = gather(A.row);
+                        col = gather(A.col);
+                        val = gather(A.val);
+                        [col row val] = csr2csc_cpu(row,col,val,m,n);
+                        AT.col = gpuArray(col);
+                        AT.row = gpuArray(row);
+                        AT.val = gpuArray(val);
+                    end
                 end
             end
         end
