@@ -4,7 +4,7 @@ reset(gpuDevice(1))
 
 M = 121401;
 N = 113331;
-P = 0.0005;
+P = 5e-4;
 
 disp('---SETUP---')
 
@@ -40,48 +40,47 @@ y = randn(M,1);
 %% Expected failues (bounds etc)
 disp('---CATCH ERRORS---')
 
-try; gpuSparse('test'); disp('failed'); end
-try; gpuSparse(rand(3,3,3)); disp('failed'); end
-try; gpuSparse(1,-1); disp('failed'); end
-try; gpuSparse(-1,1); disp('failed'); end
-try; gpuSparse(1,Inf); disp('failed'); end
-try; gpuSparse(1,NaN); disp('failed'); end
-try; gpuSparse(Inf,1); disp('failed'); end
-try; gpuSparse(NaN,1); disp('failed'); end
-try; gpuSparse(intmax('int32'),1); disp('failed'); end
-try; gpuSparse(1,intmax('int32')); disp('failed'); end
-try; gpuSparse(1,-1,0); disp('failed'); end
-try; gpuSparse(-1,1,0); disp('failed'); end
-try; gpuSparse(1,Inf,0); disp('failed'); end
-try; gpuSparse(1,NaN,0); disp('failed'); end
-try; gpuSparse(Inf,1,0); disp('failed'); end
-try; gpuSparse(NaN,1,0); disp('failed'); end
-try; gpuSparse(intmax('int32'),1,0); disp('failed'); end
-try; gpuSparse(1,intmax('int32'),0); disp('failed'); end
-try; gpuSparse(1,1,'test'); disp('failed'); end
-try; gpuSparse(1:2,1:1,1:2); disp('failed'); end
-try; gpuSparse(1:1,1:2,1:2); disp('failed'); end
-try; gpuSparse(1:2,1:2,1:1); disp('failed'); end
-try; gpuSparse(1:1,1:1,1:2); disp('failed'); end
-try; gpuSparse(1,1,1,10,0); disp('failed'); end
-try; gpuSparse(1,1,1,0,10); disp('failed'); end
-try; gpuSparse(1,1,1,10,intmax('int32')); disp('failed'); end
-try; gpuSparse(1,1,1,intmax('int32'),10); disp('failed'); end
-try; gpuSparse(1,1,10,10,'test'); disp('failed'); end
-try; gpuSparse(1,1,10,'test',10); disp('failed'); end
-try; gpuSparse(10,10,1,10,9); disp('failed'); end
-try; gpuSparse(10,10,1,9,10); disp('failed'); end
-try; gpuSparse(10,10,1,10,10,-1); disp('failed'); end
-try; gpuSparse(10,10,1,10,10,Inf); disp('failed'); end
-try; gpuSparse(1.5,1,1,10,10,1); disp('failed'); end
-try; gpuSparse(1,1.5,1,10,10,1); disp('failed'); end
-try; gpuSparse(1,1,1,10.5,10,1); disp('failed'); end
-try; gpuSparse(1,1,1,10,10.5,1); disp('failed'); end
-try; gpuSparse(1,1,1,10,10,1.5); disp('failed'); end
-try; gpuSparse(1,1,1,10:11,10,1); disp('failed'); end
-try; gpuSparse(1,1,1,10,10:11,1); disp('failed'); end
-try; gpuSparse(1,1,1,10,10,1:2); disp('failed'); end
-
+try; gpuSparse('test'); warning('failed'); end
+try; gpuSparse(rand(3,3,3)); warning('failed'); end
+try; gpuSparse(1,-1); warning('failed'); end
+try; gpuSparse(-1,1); warning('failed'); end
+try; gpuSparse(1,Inf); warning('failed'); end
+try; gpuSparse(1,NaN); warning('failed'); end
+try; gpuSparse(Inf,1); warning('failed'); end
+try; gpuSparse(NaN,1); warning('failed'); end
+try; gpuSparse(intmax('int32'),1); warning('failed'); end
+try; gpuSparse(1,intmax('int32')); warning('failed'); end
+try; gpuSparse(1,-1,0); warning('failed'); end
+try; gpuSparse(-1,1,0); warning('failed'); end
+try; gpuSparse(1,Inf,0); warning('failed'); end
+try; gpuSparse(1,NaN,0); warning('failed'); end
+try; gpuSparse(Inf,1,0); warning('failed'); end
+try; gpuSparse(NaN,1,0); warning('failed'); end
+try; gpuSparse(intmax('int32'),1,0); warning('failed'); end
+try; gpuSparse(1,intmax('int32'),0); warning('failed'); end
+try; gpuSparse(1,1,'test'); warning('failed'); end
+try; gpuSparse(1:2,1:1,1:2); warning('failed'); end
+try; gpuSparse(1:1,1:2,1:2); warning('failed'); end
+%try; gpuSparse(1:2,1:2,1:1); warning('failed'); end % this works... why is it here?!
+try; gpuSparse(1:1,1:1,1:2); warning('failed'); end
+try; gpuSparse(1,1,1,10,0); warning('failed'); end
+try; gpuSparse(1,1,1,0,10); warning('failed'); end
+try; gpuSparse(1,1,1,10,intmax('int32')); warning('failed'); end
+try; gpuSparse(1,1,1,intmax('int32'),10); warning('failed'); end
+try; gpuSparse(1,1,10,10,'test'); warning('failed'); end
+try; gpuSparse(1,1,10,'test',10); warning('failed'); end
+try; gpuSparse(10,10,1,10,9); warning('failed'); end
+try; gpuSparse(10,10,1,9,10); warning('failed'); end
+try; gpuSparse(10,10,1,10,10,-1); warning('failed'); end
+try; gpuSparse(10,10,1,10,10,Inf); warning('failed'); end
+try; gpuSparse(1.5,1,1,10,10,1); warning('failed'); end
+try; gpuSparse(1,1.5,1,10,10,1); warning('failed'); end
+try; gpuSparse(1,1,1,10.5,10,1); warning('failed'); end
+try; gpuSparse(1,1,1,10,10.5,1); warning('failed'); end
+try; gpuSparse(1,1,1,10,10,1.5); warning('failed'); end
+try; gpuSparse(1,1,1,10:11,10,1); warning('failed'); end
+try; gpuSparse(1,1,1,10,10:11,1); warning('failed'); end
+try; gpuSparse(1,1,1,10,10,1:2); warning('failed'); end
 
 %% accuracy
 disp('---ACCURACY---')
@@ -124,7 +123,6 @@ C = A'*B;
 c = a'*single(b);
 disp(['(A''*B-a''*b)     ' num2str([norm([C-c],Inf)])])
 
-
 %% miscellaneous operations
 
 disp('---MISCELLANEOUS---')
@@ -163,6 +161,10 @@ disp(norm(A,1) - norm(a,1))
 disp(norm(A,inf) - norm(a,inf))
 disp(norm(A,'fro') - norm(a,'fro'))
 
+disp('gather');
+disp(norm(gather(a)-A,inf));
+disp(norm(gather(a')-A',inf));
+disp(norm(gather(a.')-A.',inf));
 disp('full_transpose(a)')
 at = full_transpose(a); validate(at);
 disp(norm(sparse(at)-A.',inf))
@@ -184,11 +186,11 @@ disp(norm(sparse(att)-(A')',inf))
 
 disp('find')
 [i j v] = find(A); [i2 j2 v2] = find(a);
-fprintf('   %i %i %g\n',norm(i-i2),norm(j-j2),norm(v-v2))
+fprintf('   %i %i %g\n',norm(i-i2),norm(j-j2),norm(single(v)-v2))
 [i j v] = find(A'); [i2 j2 v2] = find(a');
-fprintf('   %i %i %g\n',norm(i-i2),norm(j-j2),norm(v-v2))
+fprintf('   %i %i %g\n',norm(i-i2),norm(j-j2),norm(single(v)-v2))
 [i j v] = find(A.'); [i2 j2 v2] = find(a.');
-fprintf('   %i %i %g\n',norm(i-i2),norm(j-j2),norm(v-v2))
+fprintf('   %i %i %g\n',norm(i-i2),norm(j-j2),norm(single(v)-v2))
 
 disp('nonzeros')
 disp(norm(nonzeros(A)-nonzeros(a),inf))
@@ -213,75 +215,84 @@ disp(norm((A+B)' - sparse((a+b)'),Inf))
 %% timings
 disp('---TIMINGS---')
 
-A = gather(A);
-x = gather(x);
-y = gather(y);
-
-x = double(x);
-y = double(y);
-
-tic; fprintf('A*x  (sparse)   : ')
-for k = 1:10
-    z = A*x; wait(gpuDevice);
+for j = 1:2
+    
+    A = gather(A);
+    x = gather(x);
+    y = gather(y);
+    
+    x = double(x);
+    y = double(y);
+    
+    % to test mm as well as mv multiply
+    if j==2
+        x = repmat(x,1,2);
+        y = repmat(y,1,2);
+        fprintf('\n== Matrix multiply (%i) ==\n',size(x,2));
+    end
+    
+    tic; fprintf('A*x  (sparse)   : ')
+    for k = 1:10
+        z = A*x; wait(gpuDevice);
+    end
+    toc;
+    
+    AT = A';
+    tic; fprintf('AT*y (sparse)   : ')
+    for k = 1:10
+        z = AT*y; wait(gpuDevice);
+    end
+    toc;
+    
+    tic; fprintf('A''*y (sparse)   : ')
+    for k = 1:10
+        z = A'*y; wait(gpuDevice);
+    end
+    toc;
+    
+    A = gpuArray(A);
+    x = gpuArray(x);
+    y = gpuArray(y);
+    
+    tic; fprintf('\nA*x  (gpuArray) : ')
+    for k = 1:10
+        z = A*x; wait(gpuDevice);
+    end
+    toc;
+    
+    AT = A';
+    tic; fprintf('AT*y (gpuArray) : ')
+    for k = 1:10
+        z = AT*y; wait(gpuDevice);
+    end
+    toc;
+    
+    tic; fprintf('A''*y (gpuArray) : ')
+    for k = 1:10
+        z = A'*y; wait(gpuDevice);
+    end
+    toc;
+    
+    x = single(x);
+    y = single(y);
+    
+    tic; fprintf('\na*x  (gpuSparse): ')
+    for k = 1:10
+        z = a*x; wait(gpuDevice);
+    end
+    toc;
+    
+    at = full_transpose(a); validate(at)
+    tic; fprintf('at*y (gpuSparse): ')
+    for k = 1:10
+        z = at*y; wait(gpuDevice);
+    end
+    toc;
+    
+    tic; fprintf('a''*y (gpuSparse): ')
+    for k = 1:10
+        z = a'*y; wait(gpuDevice);
+    end
+    toc;
+    
 end
-toc;
-
-AT = A';
-tic; fprintf('AT*y (sparse)   : ')
-for k = 1:10
-    z = AT*y; wait(gpuDevice);
-end
-toc;
-
-tic; fprintf('A''*y (sparse)   : ')
-for k = 1:10
-    z = A'*y; wait(gpuDevice);
-end
-toc;
-
-A = gpuArray(A);
-x = gpuArray(x);
-y = gpuArray(y);
-
-tic; fprintf('\nA*x  (gpuArray) : ')
-for k = 1:10
-    z = A*x; wait(gpuDevice);
-end
-toc;
-
-AT = A';
-tic; fprintf('AT*y (gpuArray) : ')
-for k = 1:10
-    z = AT*y; wait(gpuDevice);
-end
-toc;
-
-tic; fprintf('A''*y (gpuArray) : ')
-for k = 1:10
-    z = A'*y; wait(gpuDevice);
-end
-toc;
-
-
-x = single(x);
-y = single(y);
-
-tic; fprintf('\na*x  (gpuSparse): ')
-for k = 1:10
-    z = a*x; wait(gpuDevice);
-end
-toc;
-
-at = full_transpose(a); validate(at)
-tic; fprintf('at*y (gpuSparse): ')
-for k = 1:10
-    z = at*y; wait(gpuDevice);
-end
-toc;
-
-tic; fprintf('a''*y (gpuSparse): ')
-for k = 1:10
-    z = a'*y; wait(gpuDevice);
-end
-toc;
-
