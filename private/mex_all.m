@@ -1,12 +1,13 @@
 function mex_all()
-% tested on Linux 64-bit with Matlab R2016a/CUDA-7.5, R2017a/CUDA-8, 2019b/CUDA-10.1, 2020a/CUDA-10.2
-%
-% DOES NOT WORK WITH CUDA11 DUE TO DEPRECATED FUNCTIONS - https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html
+% tested on Linux 64-bit with Matlab R2016a/CUDA-7.5, R2017a/CUDA-8, 2019b/CUDA-10.1, 2020a/CUDA-10.2, 2020b/CUDA11
 
 % checks
 if ~exist('/usr/local/cuda','dir')
     warning('/usr/local/cuda directory not found. Try:\n%s','"sudo ln -s /usr/local/cuda-10 /usr/local/cuda"')
 end
+
+% override MATLAB's preference for its own version of nvcc
+setenv('MW_ALLOW_ANY_CUDA','1')
 
 % need to be in the current directory for mexcuda
 oldpath = pwd;

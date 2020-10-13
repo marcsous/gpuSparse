@@ -201,7 +201,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     }
 
     // Allocate space for output vectors
-    dims[0] = {c_nnz};
+    dims[0] = {(mwSize)c_nnz};
     mxGPUArray *c_col = mxGPUCreateGPUArray(ndim, dims, mxINT32_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
     if (c_col==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
