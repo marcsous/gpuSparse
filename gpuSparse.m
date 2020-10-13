@@ -621,6 +621,19 @@ classdef gpuSparse
                 A.val = A.val(nonzeros);
             end
         end
+        
+        % gather: returns sparse matrix on CPU
+        function A_sp = gather(A)
+            [m n] = size(A);
+            i = double(gather(csr2coo(A.row,A.nrows)));
+            j = double(gather(A.col));
+            v = double(gather(A.val));
+            switch A.trans
+                case 0; A_sp = sparse(i,j,v,m,n);
+                case 1; A_sp = sparse(j,i,v,m,n);
+                case 2; A_sp = sparse(j,i,conj(v),m,n);
+            end
+        end
 
         % sparse: returns sparse matrix on GPU (not efficient, mainly for debugging)
         function A_sp = sparse(A)
@@ -634,11 +647,12 @@ classdef gpuSparse
             A_sp = sparse(A);
             A_f = cast(full(A_sp),classUnderlying(A));
         end
-        
+
         % numel - should it be 1 object or prod(size(A)) elements?
         function retval = numel(A)
             retval = prod(size(A));
         end
+
         % Mathworks suggested this to help fix . indexing
         function retval = numArgumentsFromSubscript(A, s, ic)
             retval = builtin('numArgumentsFromSubscript', A, s, ic);
