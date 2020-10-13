@@ -11,11 +11,9 @@ Uses int32 and single precision to save memory (Matlab uses int64 and double).
 
 1. Save in a folder called @gpuSparse on the Matlab path
 
-2. Inside Matlab, cd to the private directory
+2. ```A = gpuSparse(rand(4))``` to trigger compilation of mex
 
-3. ```A = gpuSparse(rand(4))``` to trigger compilation of mex
-
-4. Since CUDA-11 the transpose multiplies are much faster
+3. Since CUDA-11 the transpose multiplies are much faster
 
 
 ## Timings
