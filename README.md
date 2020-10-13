@@ -19,7 +19,7 @@ Uses int32 and single precision to save memory (Matlab uses int64 and double).
 
 
 ## Timings
-```
+<pre>
 size(A) = 121401 x 113331
 nnz(A)  = 6877563 (0.05%)
 AT      = precomputed transpose of A
@@ -37,4 +37,4 @@ a*x  (gpuSparse): Elapsed time is 0.095376 seconds.
 at*y (gpuSparse): Elapsed time is 0.093627 seconds.
 ~~a'*y (gpuSparse): Elapsed time is 4.872948 seconds.~~
 a'*y (gpuSparse): Elapsed time is 0.073915 seconds.
-```
+</pre>
