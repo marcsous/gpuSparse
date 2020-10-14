@@ -18,7 +18,7 @@ Uses int32 and single precision to save memory (Matlab uses int64 and double).
 
 ## Timings
 <pre>
-<u>Due to memory layout (row-major or col-major) multiply and transpose-multiply differ drastically in performance.</u>
+<b>Due to memory layout (row/col-major) multiply and transpose-multiply differ in performance.</b>
 
 size(A) = 121401 x 113331
 nnz(A)  = 6877563 (0.05%)
@@ -32,10 +32,10 @@ A'*y (sparse)   : Elapsed time is 0.117227 seconds.
 A*x  (gpuArray) : Elapsed time is 0.134681 seconds.
 AT*y (gpuArray) : Elapsed time is 0.138336 seconds.
 <s>A'*y (gpuArray) : Elapsed time is 4.140603 seconds.</s>
-A'*y (gpuArray) : Elapsed time is 0.211860 seconds. (CUDA 11)
+A'*y (gpuArray) : Elapsed time is 0.211860 seconds. <i>(CUDA 11)</i>
 
 a*x  (gpuSparse): Elapsed time is 0.095376 seconds.
 at*y (gpuSparse): Elapsed time is 0.093627 seconds.
 <s>a'*y (gpuSparse): Elapsed time is 4.872948 seconds.</s>
-a'*y (gpuSparse): Elapsed time is 0.073915 seconds. (CUDA 11)
+a'*y (gpuSparse): Elapsed time is 0.073915 seconds. <i>(CUDA 11)</i>
 </pre>
