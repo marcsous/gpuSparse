@@ -30,7 +30,7 @@ A'*y (sparse)   : Elapsed time is 0.042892 seconds.
 
 A*x  (gpuArray) : Elapsed time is 0.015322 seconds.
 AT*y (gpuArray) : Elapsed time is 0.014198 seconds.
-A'*y (gpuArray) : Elapsed time is 0.025913 seconds.
+A'*y (gpuArray) : Elapsed time is 0.025913 seconds. <i>(CUDA 11)</i>
 <s>A'*y (gpuArray) : Elapsed time is 2.156371 seconds.</s>
 
 a*x  (gpuSparse): Elapsed time is 0.029609 seconds.
