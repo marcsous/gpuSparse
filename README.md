@@ -13,7 +13,7 @@ Uses int32 and single precision to save memory (Matlab uses int64 and double).
 
 2. ```A = gpuSparse(rand(4))``` to trigger compilation of mex
 
-3. <b>Recommended:</b> since CUDA-11 the transpose multiplies are much faster
+3. <b>Recommended:</b> since CUDA-11 the transpose-multiply is much faster
 
 
 ## Timings
