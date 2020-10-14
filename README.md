@@ -18,9 +18,12 @@ Uses int32 and single precision to save memory (Matlab uses int64 and double).
 
 ## Timings
 <pre>
+<u>Due to memory layout (row-major or col-major) multiply and transpose-multiply differ drastically in performance.</u>
+
 size(A) = 121401 x 113331
 nnz(A)  = 6877563 (0.05%)
 AT      = precomputed transpose of A
+
 
 A*x  (sparse)   : Elapsed time is 1.056144 seconds.
 AT*y (sparse)   : Elapsed time is 1.216099 seconds.
