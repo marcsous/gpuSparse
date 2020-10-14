@@ -38,5 +38,5 @@ at*y (gpuSparse): Elapsed time is 0.025422 seconds.
 a'*y (gpuSparse): Elapsed time is 0.023224 seconds. <i>(CUDA 11)</i>
 <s>a'*y (gpuSparse): Elapsed time is 2.708314 seconds.</s>
 
-<b>If anyone knows why gpuArray(double) is faster than gpuSparse(single) please let me know!<\b>
+<b>If anyone knows why gpuArray(double) is faster than gpuSparse(single) please let me know!</b>
 </pre>
