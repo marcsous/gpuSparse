@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <iostream>
 
 /* Using updated (v2) interfaces to cublas */
 #include <cuda_runtime.h>
