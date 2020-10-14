@@ -24,18 +24,19 @@ size(A) = 121401 x 113331
 nnz(A)  = 6877563 (0.05%)
 AT      = precomputed transpose of A
 
+A*x  (sparse)   : Elapsed time is 0.210246 seconds.
+AT*y (sparse)   : Elapsed time is 0.203459 seconds.
+A'*y (sparse)   : Elapsed time is 0.042892 seconds.
 
-A*x  (sparse)   : Elapsed time is 1.056144 seconds.
-AT*y (sparse)   : Elapsed time is 1.216099 seconds.
-A'*y (sparse)   : Elapsed time is 0.117227 seconds.
+A*x  (gpuArray) : Elapsed time is 0.015322 seconds.
+AT*y (gpuArray) : Elapsed time is 0.014198 seconds.
+A'*y (gpuArray) : Elapsed time is 0.025913 seconds.
+<s>A'*y (gpuArray) : Elapsed time is 2.156371 seconds.</s>
 
-A*x  (gpuArray) : Elapsed time is 0.134681 seconds.
-AT*y (gpuArray) : Elapsed time is 0.138336 seconds.
-<s>A'*y (gpuArray) : Elapsed time is 4.140603 seconds.</s>
-A'*y (gpuArray) : Elapsed time is 0.211860 seconds. <i>(CUDA 11)</i>
-
-a*x  (gpuSparse): Elapsed time is 0.095376 seconds.
-at*y (gpuSparse): Elapsed time is 0.093627 seconds.
-<s>a'*y (gpuSparse): Elapsed time is 4.872948 seconds.</s>
-a'*y (gpuSparse): Elapsed time is 0.073915 seconds. <i>(CUDA 11)</i>
+a*x  (gpuSparse): Elapsed time is 0.029609 seconds.
+at*y (gpuSparse): Elapsed time is 0.025422 seconds.
+a'*y (gpuSparse): Elapsed time is 0.023224 seconds. <i>(CUDA 11)</i>
+<s>a'*y (gpuSparse): Elapsed time is 2.708314 seconds.</s>
 </pre>
+
+<b>If anyone knows why gpuArray(double) is 2x faster than gpuSparse(single) please let me know!<\b>
