@@ -3,7 +3,7 @@
 Matlab mex wrappers to NVIDIA cuSPARSE (https://developer.nvidia.com/cusparse).
 
 
-Uses int32 and single precision to save memory (Matlab uses int64 and double).
+Uses int32 and single precision to save memory (Matlab sparse uses int64 and double).
 
 
 ## Installation
