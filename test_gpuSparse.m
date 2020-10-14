@@ -228,7 +228,7 @@ for j = 1:2
     if j==2
         x = repmat(x,1,2);
         y = repmat(y,1,2);
-        fprintf('\n== Matrix multiply (%i) ==\n',size(x,2));
+        fprintf('\n== Matrix multiply (cols %i) ==\n',size(x,2));
     end
     
     tic; fprintf('A*x  (sparse)   : ')
