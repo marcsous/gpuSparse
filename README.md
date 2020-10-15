@@ -24,15 +24,18 @@ size(A) = 121401 x 113331
 nnz(A)  = 6877563 (0.05%)
 AT      = precomputed transpose of A
 
+<b>CPU sparse</b>
 A*x  (sparse)   : Elapsed time is 0.210246 seconds.
 AT*y (sparse)   : Elapsed time is 0.203459 seconds.
 A'*y (sparse)   : Elapsed time is 0.042892 seconds.
 
+<b>GPU sparse</b>
 A*x  (gpuArray) : Elapsed time is 0.015322 seconds.
 AT*y (gpuArray) : Elapsed time is 0.014198 seconds.
 A'*y (gpuArray) : Elapsed time is 0.025913 seconds. <i>(CUDA 11)</i>
 <s>A'*y (gpuArray) : Elapsed time is 2.156371 seconds.</s>
 
+<b>GPU gpuSparse</b>
 a*x  (gpuSparse): Elapsed time is 0.029609 seconds.
 at*y (gpuSparse): Elapsed time is 0.025422 seconds.
 a'*y (gpuSparse): Elapsed time is 0.023224 seconds. <i>(CUDA 11)</i>
