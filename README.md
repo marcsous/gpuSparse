@@ -20,8 +20,8 @@ Uses int32 and single precision to save memory (Matlab sparse uses int64 and dou
 <pre>
 <b>Due to memory layout (row/col-major) multiply and transpose-multiply differ in performance.</b>
 
-size(A) = 121401 x 113331
-nnz(A)  = 6877563 (0.05%)
+size(A) = 221,401 x 213,331
+nnz(A)  = 23,609,791 (0.05%)
 AT      = precomputed transpose of A
 
 <b>CPU sparse</b>
