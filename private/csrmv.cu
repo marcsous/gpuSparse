@@ -47,7 +47,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if(!mxIsGPUArray(ROW_CSR)) mxShowCriticalErrorMessage("ROW_CSR argument is not on GPU");
     if(!mxIsGPUArray(COL)) mxShowCriticalErrorMessage("COL argument is not on GPU");
     if(!mxIsGPUArray(VAL)) mxShowCriticalErrorMessage("VAL argument is not on GPU");
-    //if(!mxIsGPUArray(X)) mxShowCriticalErrorMessage("B argument is not on GPU");
+    if(!mxIsGPUArray(X)) mxShowCriticalErrorMessage("X argument is not on GPU");
 
     if (!mxIsScalar(NROWS)) mxShowCriticalErrorMessage("NROWS argument must be a scalar");
     if (!mxIsScalar(NCOLS)) mxShowCriticalErrorMessage("NCOLS argument must be a scalar");
@@ -94,14 +94,17 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 
     // Check real/complex
     mxComplexity ccx = mxGPUGetComplexity(x);
-    if (mxGPUGetComplexity(val) != ccx) mxShowCriticalErrorMessage("VAL and X must have same complexity");
+    mxComplexity ccv = mxGPUGetComplexity(val);
+    mxComplexity ccy = (ccx==mxCOMPLEX || ccv==mxCOMPLEX) ? mxCOMPLEX : mxREAL;   
+    // unfortunately mixed real/complex are not supported so throw an error 
+    if(ccx != ccv) mxShowCriticalErrorMessage("Matrix and vector must have same complexity");
 
     // Create space for output vector
     const mwSize ndim = 1;
     mwSize dims[ndim] = {trans == CUSPARSE_OPERATION_NON_TRANSPOSE ? nrows : ncols};
     mxClassID cid = mxGPUGetClassID(x);
     
-    mxGPUArray *y = mxGPUCreateGPUArray(ndim, dims, cid, ccx, MX_GPU_INITIALIZE_VALUES);
+    mxGPUArray *y = mxGPUCreateGPUArray(ndim, dims, cid, ccy, MX_GPU_INITIALIZE_VALUES);
     if (y==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed.");
 
     // Get handle to the CUBLAS context
@@ -136,10 +139,11 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if (nnz_check != nnz) mxShowCriticalErrorMessage("ROW_CSR argument last element != nnz",nnz_check);
 
     // Call cusparse multiply function in (S)ingle precision
-    if (ccx == mxREAL)
+    const float alpha = 1.0; //make_cuFloatComplex(1.0, 0.0);
+    const float beta = 0.0; //make_cuFloatComplex(0.0, 0.0);
+
+    if (ccv==mxREAL && ccx==mxREAL)
     {
-    	const float alpha = 1.0;
-    	const float beta = 0.0;
         float* d_y = (float*)mxGPUGetData(y);
     	const float* const d_val = (float*)mxGPUGetDataReadOnly(val);
     	const float* const d_x = (float*)mxGPUGetDataReadOnly(x);
@@ -149,13 +153,35 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
         cusparseStatus = cusparseScsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
 #endif
     }
+/*
+    else if (ccv==mxREAL && ccx==mxCOMPLEX)
+    {
+        cuFloatComplex* d_y = (cuFloatComplex*)mxGPUGetData(y);
+    	const float* const d_val = (float*)mxGPUGetDataReadOnly(val);
+    	const cuFloatComplex* const d_x = (cuFloatComplex*)mxGPUGetDataReadOnly(x);
+#if CUDART_VERSION >= 11000	
+        cusparseStatus = cusparseXcsrmv_wrapper(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+#else
+        cusparseStatus = cusparseCcsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+#endif
+    }
+    else if (ccv==mxCOMPLEX && ccx==mxREAL)
+    {
+        cuFloatComplex* d_y = (cuFloatComplex*)mxGPUGetData(y);
+    	const cuFloatComplex* const d_val = (cuFloatComplex*)mxGPUGetDataReadOnly(val);
+    	const float* const d_x = (float*)mxGPUGetDataReadOnly(x);
+#if CUDART_VERSION >= 11000	
+        cusparseStatus = cusparseXcsrmv_wrapper(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+#else
+        cusparseStatus = cusparseCcsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+#endif
+    }
+*/
     else
     {
-    	const cuFloatComplex alpha = make_cuFloatComplex(1.0, 0.0);
-        const cuFloatComplex beta = make_cuFloatComplex(0.0, 0.0);
-        cuFloatComplex *d_y = (cuFloatComplex*)mxGPUGetData(y);
-    	const cuFloatComplex * const d_val = (cuFloatComplex*)mxGPUGetDataReadOnly(val);
-    	const cuFloatComplex * const d_x = (cuFloatComplex*)mxGPUGetDataReadOnly(x);
+        cuFloatComplex* d_y = (cuFloatComplex*)mxGPUGetData(y);
+    	const cuFloatComplex* const d_val = (cuFloatComplex*)mxGPUGetDataReadOnly(val);
+    	const cuFloatComplex* const d_x = (cuFloatComplex*)mxGPUGetDataReadOnly(x);
 #if CUDART_VERSION >= 11000	
         cusparseStatus = cusparseXcsrmv_wrapper(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
 #else

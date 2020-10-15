@@ -3,6 +3,7 @@
 #include <cuda_runtime.h> 
 #include <cusparse.h> 
 #include "mxShowCriticalErrorMessage.c"
+#include <iostream>
 
 #define CHECK_CUSPARSE(func)                                   \
 {                                                              \
@@ -23,36 +24,40 @@ cusparseXcsrmv_wrapper(cusparseHandle_t         handle,
                        int                      A_num_rows,
                        int                      A_num_cols,
                        int                      A_num_nnz,
-                       const T*                 alpha,
+                       const float*             alpha,
                        const cusparseMatDescr_t descrA,
                        const T*                 dA_values,
                        const int*               dA_csrOffsets,
                        const int*               dA_columns,
                        const T*                 dX,
-                       const T*                 beta,
-                       T*                       dY)
+                       const float*             beta,
+                       void*                    dY)
 {
     cusparseSpMatDescr_t matA;
     cusparseDnVecDescr_t vecX, vecY;
     void*        buffer     = NULL;
     size_t       bufferSize = 0;
-    cudaDataType type       = type_to_enum<T>();
-    int X_rows = (transA==CUSPARSE_OPERATION_NON_TRANSPOSE) ? A_num_cols : A_num_rows;    
-    int Y_rows = (transA==CUSPARSE_OPERATION_NON_TRANSPOSE) ? A_num_rows : A_num_cols;   
-
+    cudaDataType typeA       = type_to_enum<T>();
+    cudaDataType typeX       = type_to_enum<T>();
+    cudaDataType typeY       = (typeA==CUDA_C_32F || typeX==CUDA_C_32F) ? CUDA_C_32F : CUDA_R_32F;
+    
+//std::cout << "typeA " << typeA << " typeX " << typeX << " typeY " << typeY << std::endl;
+    
     // Create sparse matrix A in CSR format
     CHECK_CUSPARSE( cusparseCreateCsr(&matA, A_num_rows, A_num_cols, A_num_nnz,
                                       (void*)dA_csrOffsets, (void*)dA_columns, (void*)dA_values,
                                       CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
-                                      cusparseGetMatIndexBase(descrA), type) )
+                                      cusparseGetMatIndexBase(descrA), typeA) )
     // Create dense vector X
-    CHECK_CUSPARSE( cusparseCreateDnVec(&vecX, X_rows, (void*)dX, type) )
+    int X_rows = (transA==CUSPARSE_OPERATION_NON_TRANSPOSE) ? A_num_cols : A_num_rows;
+    CHECK_CUSPARSE( cusparseCreateDnVec(&vecX, X_rows, (void*)dX, typeX) )
     // Create dense vector y
-    CHECK_CUSPARSE( cusparseCreateDnVec(&vecY, Y_rows, (void*)dY, type) )
+    int Y_rows = (transA==CUSPARSE_OPERATION_NON_TRANSPOSE) ? A_num_rows : A_num_cols;
+    CHECK_CUSPARSE( cusparseCreateDnVec(&vecY, Y_rows, (void*)dY, typeY) )
     // allocate an external buffer if needed
     CHECK_CUSPARSE( cusparseSpMV_bufferSize(
                                  handle, transA,
-                                 alpha, matA, vecX, beta, vecY, type,
+                                 alpha, matA, vecX, beta, vecY, typeY,
                                  CUSPARSE_MV_ALG_DEFAULT, &bufferSize) )
     if (bufferSize > 0)
     {
@@ -60,10 +65,15 @@ cusparseXcsrmv_wrapper(cusparseHandle_t         handle,
         if (status != cudaSuccess)
             return CUSPARSE_STATUS_ALLOC_FAILED;
     }
+    
+//std::cout << "bufferSize " << bufferSize << " CUSPARSE_STATUS_NOT_SUPPORTED " << CUSPARSE_STATUS_NOT_SUPPORTED << std::endl;     
+    
     // execute SpMV
     CHECK_CUSPARSE( cusparseSpMV(handle, transA,
-                                 alpha, matA, vecX, beta, vecY, type,
+                                 alpha, matA, vecX, beta, vecY, typeY,
                                  CUSPARSE_MV_ALG_DEFAULT, buffer) )
+
+                                 
     // destroy matrix/vector descriptors
     CHECK_CUSPARSE( cusparseDestroySpMat(matA) )
     CHECK_CUSPARSE( cusparseDestroyDnVec(vecX) )
@@ -73,7 +83,7 @@ cusparseXcsrmv_wrapper(cusparseHandle_t         handle,
 }
 
 // -------------------------------------------------------------------------------//
-template<typename T>
+template<typename T, typename S>
 cusparseStatus_t
 cusparseXcsrmm_wrapper(cusparseHandle_t         handle,
                        cusparseOperation_t      transA,
@@ -81,23 +91,25 @@ cusparseXcsrmm_wrapper(cusparseHandle_t         handle,
                        int                      A_num_cols,
                        int                      B_num_cols,
                        int                      A_num_nnz,
-                       const T*                 alpha,
+                       const float*             alpha,
                        const cusparseMatDescr_t descrA,
                        const T*                 dA_values,
                        const int*               dA_csrOffsets,
                        const int*               dA_columns,
-                       const T*                 dB,
+                       const S*                 dB,
                        int                      ldb,
-                       const T*                 beta,
-                       T*                       dC,
+                       const float*             beta,
+                       void*                    dC,
                        int                      ldc)
 {
     cusparseSpMatDescr_t matA;
     cusparseDnMatDescr_t matB, matC;
     void*        buffer     = NULL;
     size_t       bufferSize = 0;
-    cudaDataType type       = type_to_enum<T>();
-    
+    cudaDataType typeA      = type_to_enum<T>();
+    cudaDataType typeB      = type_to_enum<S>();  
+    cudaDataType typeC      = (typeA==CUDA_C_32F || typeB==CUDA_C_32F) ? CUDA_C_32F : CUDA_R_32F;
+
     // handle some limited transpose functionality (A or A' only)
     cusparseOperation_t transB = CUSPARSE_OPERATION_NON_TRANSPOSE;   
     int B_num_rows = (transA==CUSPARSE_OPERATION_NON_TRANSPOSE) ? A_num_cols : A_num_rows;
@@ -108,15 +120,15 @@ cusparseXcsrmm_wrapper(cusparseHandle_t         handle,
     CHECK_CUSPARSE( cusparseCreateCsr(&matA, A_num_rows, A_num_cols, A_num_nnz,
                                       (void*)dA_csrOffsets, (void*)dA_columns, (void*)dA_values,
                                       CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
-                                      cusparseGetMatIndexBase(descrA), type) )
+                                      cusparseGetMatIndexBase(descrA), typeA) )
     // Create dense vector X
-    CHECK_CUSPARSE( cusparseCreateDnMat(&matB, B_num_rows, B_num_cols, ldb, (void*)dB, type, CUSPARSE_ORDER_COL) )
+    CHECK_CUSPARSE( cusparseCreateDnMat(&matB, B_num_rows, B_num_cols, ldb, (void*)dB, typeB, CUSPARSE_ORDER_COL) )
     // Create dense vector y
-    CHECK_CUSPARSE( cusparseCreateDnMat(&matC, C_num_rows, C_num_cols, ldc, (void*)dC, type, CUSPARSE_ORDER_COL) )
+    CHECK_CUSPARSE( cusparseCreateDnMat(&matC, C_num_rows, C_num_cols, ldc, (void*)dC, typeC, CUSPARSE_ORDER_COL) )
     // allocate an external buffer if needed
     CHECK_CUSPARSE( cusparseSpMM_bufferSize(
                                  handle, transA, transB,
-                                 alpha, matA, matB, beta, matC, type,
+                                 alpha, matA, matB, beta, matC, typeC,
                                  CUSPARSE_SPMM_ALG_DEFAULT, &bufferSize) )
     if (bufferSize > 0)  {
         cudaError_t status = cudaMalloc(&buffer, bufferSize);
@@ -125,7 +137,7 @@ cusparseXcsrmm_wrapper(cusparseHandle_t         handle,
     }
     // execute SpMM
     CHECK_CUSPARSE( cusparseSpMM(handle, transA, transB,
-                                 alpha, matA, matB, beta, matC, type,
+                                 alpha, matA, matB, beta, matC, typeC,
                                  CUSPARSE_SPMM_ALG_DEFAULT, buffer) )
     // destroy matrix/vector descriptors
     CHECK_CUSPARSE( cusparseDestroySpMat(matA) )

@@ -113,19 +113,19 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     cusparseSetMatIndexBase(descr,CUSPARSE_INDEX_BASE_ONE);
 
     // Convert from matlab pointers to native pointers
-    const int * const d_a_col = (int*)mxGPUGetDataReadOnly(a_col);
-    const int * const d_b_col = (int*)mxGPUGetDataReadOnly(b_col);
+    const int* const d_a_col = (int*)mxGPUGetDataReadOnly(a_col);
+    const int* const d_b_col = (int*)mxGPUGetDataReadOnly(b_col);
 
-    const float * const d_a_val = (float*)mxGPUGetDataReadOnly(a_val);
-    const float * const d_b_val = (float*)mxGPUGetDataReadOnly(b_val);
+    const float* const d_a_val = (float*)mxGPUGetDataReadOnly(a_val);
+    const float* const d_b_val = (float*)mxGPUGetDataReadOnly(b_val);
 
-    const int * const d_a_row_csr = (int*)mxGPUGetDataReadOnly(a_row_csr);
-    const int * const d_b_row_csr = (int*)mxGPUGetDataReadOnly(b_row_csr);
+    const int* const d_a_row_csr = (int*)mxGPUGetDataReadOnly(a_row_csr);
+    const int* const d_b_row_csr = (int*)mxGPUGetDataReadOnly(b_row_csr);
 
     int *d_c_col = NULL;
     float *d_c_val = NULL;
     int *d_c_row_csr = (int*)mxGPUGetData(c_row_csr);
-
+   
     const float alpha = (float)mxGetScalar(ALPHA);
     const float beta = (float)mxGetScalar(BETA);
 
