@@ -7,7 +7,10 @@ classdef gpuSparse
     %
     % The nzmax argument can be used to check sufficient
     % memory: gpuSparse([],[],[],nrows,ncols,nzmax)
-
+    %
+    % TO DO: handle mixed real/complex efficiently
+    %        allow 16 bit floating point data type 
+    %
     %%
     properties (SetAccess = immutable)
         
@@ -622,30 +625,29 @@ classdef gpuSparse
             end
         end
         
-        % gather: returns sparse matrix on CPU
-        function A_sp = gather(A)
+        % sparse: returns sparse matrix on GPU
+        function A_sp = sparse(A)
             [m n] = size(A);
-            i = double(gather(csr2coo(A.row,A.nrows)));
-            j = double(gather(A.col));
-            v = double(gather(A.val));
+            i = csr2coo(A.row,A.nrows);
+            j = A.col;
+            v = double(A.val);
             switch A.trans
+                % int32 indices ok (2020a)
                 case 0; A_sp = sparse(i,j,v,m,n);
                 case 1; A_sp = sparse(j,i,v,m,n);
                 case 2; A_sp = sparse(j,i,conj(v),m,n);
             end
         end
 
-        % sparse: returns sparse matrix on GPU (not efficient, mainly for debugging)
-        function A_sp = sparse(A)
-            [m n] = size(A);
-            [i j v] = find(A);
-            A_sp = sparse(i,j,double(v),m,n);
+        % gather: returns sparse matrix on CPU
+        function A_sp = gather(A)
+            A_sp = gather(sparse(A));
         end
         
         % full: returns full matrix on GPU (not efficient, mainly for debugging)
         function A_f = full(A)
-            A_sp = sparse(A);
-            A_f = cast(full(A_sp),classUnderlying(A));
+            A_f = sparse(A);
+            A_f = cast(full(A_f),classUnderlying(A));
         end
 
         % numel - should it be 1 object or prod(size(A)) elements?

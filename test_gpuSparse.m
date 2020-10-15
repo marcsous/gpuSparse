@@ -2,8 +2,8 @@
 clear all
 reset(gpuDevice(1))
 
-M = 121401;
-N = 113331;
+M = 221401;
+N = 213331;
 P = 5e-4;
 
 disp('---SETUP---')
@@ -33,8 +33,8 @@ b = gpuSparse(i,j,v,M,N); validate(b)
 fprintf('errors = [%i %i %i]. ',any(a.row~=b.row),any(a.col~=b.col),any(a.val~=b.val))
 toc
 
-x = randn(N,1);
-y = randn(M,1);
+x = randn(N,1,'gpuArray');
+y = randn(M,1,'gpuArray');
 
 
 %% Expected failues (bounds etc)
@@ -132,8 +132,8 @@ disp('---MISCELLANEOUS---')
 A = A + 1i*sprandn(A);
 a = gpuSparse(A); validate(a)
 
-x = single(randn(N,1) + 1i*randn(N,1));
-y = single(randn(M,1) + 1i*randn(M,1));
+x = single(randn(N,1) + 1i*randn(N,1,'gpuArray'));
+y = single(randn(M,1) + 1i*randn(M,1,'gpuArray'));
 
 disp('complex multiply')
 disp(norm(A*double(x) - a*x,Inf))
