@@ -139,11 +139,10 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if (nnz_check != nnz) mxShowCriticalErrorMessage("ROW_CSR argument last element != nnz",nnz_check);
 
     // Call cusparse multiply function in (S)ingle precision
-    const float alpha = 1.0; //make_cuFloatComplex(1.0, 0.0);
-    const float beta = 0.0; //make_cuFloatComplex(0.0, 0.0);
-
     if (ccv==mxREAL && ccx==mxREAL)
     {
+        const float alpha = 1.0; 
+        const float beta = 0.0; 
         float* d_y = (float*)mxGPUGetData(y);
     	const float* const d_val = (float*)mxGPUGetDataReadOnly(val);
     	const float* const d_x = (float*)mxGPUGetDataReadOnly(x);
@@ -179,6 +178,8 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 */
     else
     {
+        const cuFloatComplex alpha = make_cuFloatComplex(1.0, 0.0);
+        const cuFloatComplex beta = make_cuFloatComplex(0.0, 0.0);
         cuFloatComplex* d_y = (cuFloatComplex*)mxGPUGetData(y);
     	const cuFloatComplex* const d_val = (cuFloatComplex*)mxGPUGetDataReadOnly(val);
     	const cuFloatComplex* const d_x = (cuFloatComplex*)mxGPUGetDataReadOnly(x);

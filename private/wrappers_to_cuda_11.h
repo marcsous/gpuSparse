@@ -24,13 +24,13 @@ cusparseXcsrmv_wrapper(cusparseHandle_t         handle,
                        int                      A_num_rows,
                        int                      A_num_cols,
                        int                      A_num_nnz,
-                       const float*             alpha,
+                       const T*                 alpha,
                        const cusparseMatDescr_t descrA,
                        const T*                 dA_values,
                        const int*               dA_csrOffsets,
                        const int*               dA_columns,
                        const T*                 dX,
-                       const float*             beta,
+                       const T*                 beta,
                        void*                    dY)
 {
     cusparseSpMatDescr_t matA;
