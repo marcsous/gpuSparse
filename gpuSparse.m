@@ -8,9 +8,6 @@ classdef gpuSparse
     % The nzmax argument can be used to check sufficient
     % memory: gpuSparse([],[],[],nrows,ncols,nzmax)
     %
-    % TO DO: handle mixed real/complex efficiently
-    %        allow 16 bit floating point data type 
-    %
     %%
     properties (SetAccess = immutable)
         
@@ -505,28 +502,17 @@ classdef gpuSparse
                 y = A;
                 y.val = y.val * x;
             elseif isvector(x)
-                if isreal(A) == isreal(x)
+                if isreal(A)
                     y = csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,x);
-                elseif isreal(A)
-                    y = complex(csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,real(x)), ...
-                                csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,imag(x)));
-                elseif isreal(x)
-                    y = csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,complex(x));
                 else
-                    error('Should never get here.')
+                    y = csrmv(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,complex(x));
                 end
             elseif ismatrix(x)
-                if ~isreal(A)
-                    error('Complex A not supported at the moment.')
-                end
-                if isreal(x)
+                if isreal(A)
                     y = csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,x);
                 else
-                    y = complex(csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,real(x)), ...
-                                csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,imag(x)));
+                    y = csrmm(A.row,A.col,A.val,A.nrows,A.ncols,A.trans,complex(x));
                 end
-            else
-                error('Argument x has too many dimensions.')
             end
         end
         
@@ -639,9 +625,18 @@ classdef gpuSparse
             end
         end
 
-        % gather: returns sparse matrix on CPU
+        % gather: returns sparse matrix on CPU (gather(sparse(A)) is faster but memory intensive) 
         function A_sp = gather(A)
-            A_sp = gather(sparse(A));
+            [m n] = size(A);
+            i = gather(csr2coo(A.row,A.nrows));
+            j = gather(A.col);
+            v = gather(double(A.val));
+            switch A.trans
+                % int32 indices ok (2020a)
+                case 0; A_sp = sparse(i,j,v,m,n);
+                case 1; A_sp = sparse(j,i,v,m,n);
+                case 2; A_sp = sparse(j,i,conj(v),m,n);
+            end
         end
         
         % full: returns full matrix on GPU (not efficient, mainly for debugging)

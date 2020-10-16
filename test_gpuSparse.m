@@ -135,6 +135,11 @@ a = gpuSparse(A); validate(a)
 x = single(randn(N,1) + 1i*randn(N,1,'gpuArray'));
 y = single(randn(M,1) + 1i*randn(M,1,'gpuArray'));
 
+disp('real multiply')
+disp(norm(real(A)*double(real(x)) - real(a)*real(x),Inf))
+disp(norm(real(A')*double(real(y)) - real(a')*real(y),Inf))
+disp(norm(real(A.')*double(real(y)) - real(a.')*real(y),Inf))
+
 disp('complex multiply')
 disp(norm(A*double(x) - a*x,Inf))
 disp(norm(A'*double(y) - a'*y,Inf))
@@ -147,7 +152,6 @@ disp(norm(A'*real(double(y)) - a'*real(y),Inf))
 disp(norm(A.'*real(double(y)) - a.'*real(y),Inf))
 disp(norm(real(A')*double(y) - real(a')*y,Inf))
 disp(norm(real(A.')*double(y) - real(a.')*y,Inf))
-disp(norm(real(A)*real(double(x)) - real(a)*real(x),Inf))
 
 disp('max')
 disp(norm(full(max(A,[],2)) - max(a,[],2)))
@@ -161,10 +165,10 @@ disp(norm(A,1) - norm(a,1))
 disp(norm(A,inf) - norm(a,inf))
 disp(norm(A,'fro') - norm(a,'fro'))
 
-disp('gather');
-disp(norm(gather(a)-A,inf));
-disp(norm(gather(a')-A',inf));
-disp(norm(gather(a.')-A.',inf));
+disp('sparse');
+disp(norm(sparse(a)-A,inf));
+disp(norm(sparse(a')-A',inf));
+disp(norm(sparse(a.')-A.',inf));
 disp('full_transpose(a)')
 at = full_transpose(a); validate(at);
 disp(norm(sparse(at)-A.',inf))
@@ -232,20 +236,20 @@ for j = 1:2
     end
     
     tic; fprintf('A*x  (sparse)   : ')
-    for k = 1:10
+    for k = 1:20
         z = A*x; wait(gpuDevice);
     end
     toc;
     
     AT = A';
     tic; fprintf('AT*y (sparse)   : ')
-    for k = 1:10
+    for k = 1:20
         z = AT*y; wait(gpuDevice);
     end
     toc;
     
     tic; fprintf('A''*y (sparse)   : ')
-    for k = 1:10
+    for k = 1:20
         z = A'*y; wait(gpuDevice);
     end
     toc;
@@ -255,20 +259,20 @@ for j = 1:2
     y = gpuArray(y);
     
     tic; fprintf('\nA*x  (gpuArray) : ')
-    for k = 1:10
+    for k = 1:20
         z = A*x; wait(gpuDevice);
     end
     toc;
     
     AT = A';
     tic; fprintf('AT*y (gpuArray) : ')
-    for k = 1:10
+    for k = 1:20
         z = AT*y; wait(gpuDevice);
     end
     toc;
     
     tic; fprintf('A''*y (gpuArray) : ')
-    for k = 1:10
+    for k = 1:20
         z = A'*y; wait(gpuDevice);
     end
     toc;
@@ -277,20 +281,20 @@ for j = 1:2
     y = single(y);
     
     tic; fprintf('\na*x  (gpuSparse): ')
-    for k = 1:10
+    for k = 1:20
         z = a*x; wait(gpuDevice);
     end
     toc;
     
     at = full_transpose(a); validate(at)
     tic; fprintf('at*y (gpuSparse): ')
-    for k = 1:10
+    for k = 1:20
         z = at*y; wait(gpuDevice);
     end
     toc;
     
     tic; fprintf('a''*y (gpuSparse): ')
-    for k = 1:10
+    for k = 1:20
         z = a'*y; wait(gpuDevice);
     end
     toc;
