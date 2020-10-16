@@ -46,7 +46,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if(!mxIsGPUArray(ROW_CSR)) mxShowCriticalErrorMessage("ROW_CSR argument is not on GPU");
     if(!mxIsGPUArray(COL)) mxShowCriticalErrorMessage("COL argument is not on GPU");
     if(!mxIsGPUArray(VAL)) mxShowCriticalErrorMessage("VAL argument is not on GPU");
-    //if(!mxIsGPUArray(B)) mxShowCriticalErrorMessage("B argument is not on GPU");
+    if(!mxIsGPUArray(B)) mxShowCriticalErrorMessage("B argument is not on GPU");
 
     // Initialize the MathWorks GPU API
     mxInitGPU();
@@ -93,18 +93,18 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if (mxGPUGetClassID(val) != mxSINGLE_CLASS) mxShowCriticalErrorMessage("VAL argument is not single");
     if (mxGPUGetClassID(b) != mxSINGLE_CLASS) mxShowCriticalErrorMessage("B argument is not single");
 
-    // Check real/complex
-    mxComplexity ccb = mxGPUGetComplexity(b);
-    if (mxGPUGetComplexity(val) != ccb) mxShowCriticalErrorMessage("VAL and B must have same complexity");
+    // Check real/complex - mixed is not supported except special case (real A / complex B)
+    mxComplexity ccb = mxGPUGetComplexity(b);          
+    mxComplexity ccv = mxGPUGetComplexity(val);
+    mxComplexity ccc = (ccb==mxCOMPLEX || ccv==mxCOMPLEX) ? mxCOMPLEX : mxREAL;
+    if(ccb==mxREAL && ccv==mxCOMPLEX) mxShowCriticalErrorMessage("Complex matrix and real vector not supported");
 
     // Create space for output vectors
     const mwSize ndim = 2;
     mwSize cdims[ndim] = {trans == CUSPARSE_OPERATION_NON_TRANSPOSE ? m : k, n};
     mxClassID cid = mxGPUGetClassID(b); // same class as B matrix
     int ldc = cdims[0]; // leading dimension of C
-    
-    mxGPUArray *c = mxGPUCreateGPUArray(ndim, cdims, cid, ccb, MX_GPU_INITIALIZE_VALUES); // initialize 0
-    if (c==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
+    mxGPUArray *c;
 
     // Get handle to the CUBLAS context
     cublasHandle_t cublasHandle = 0;
@@ -126,9 +126,6 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     // Convert from matlab pointers to native pointers 
     const int * const d_row_csr = (int*)mxGPUGetDataReadOnly(row_csr);
     const int * const d_col = (int*)mxGPUGetDataReadOnly(col);
-    const float * const d_val = (float*)mxGPUGetDataReadOnly(val);
-    const float * const d_b = (float*)mxGPUGetDataReadOnly(b);
-    float *d_c = (float*)mxGPUGetData(c);
 
     // Now we can access the arrays, we can do some checks
     int base;
@@ -141,22 +138,79 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if (nnz_check != nnz) mxShowCriticalErrorMessage("ROW_CSR argument last element != nnz",nnz_check);
 
     // Call cusparse multiply function in (S)ingle precision
-    const float alpha = 1.0;
-    const float beta = 0.0;
+    if (ccv==mxREAL && ccb==mxREAL)
+    {
+        const float alpha = 1.0;
+        const float beta = 0.0;
+        const float * const d_val = (float*)mxGPUGetDataReadOnly(val);
+        const float * const d_b = (float*)mxGPUGetDataReadOnly(b);
+       
+        c = mxGPUCreateGPUArray(ndim, cdims, cid, ccc, MX_GPU_INITIALIZE_VALUES);
+        if (c==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
+        float *d_c = (float*)mxGPUGetData(c);
 
 #if CUDART_VERSION >= 11000
-    cusparseStatus = cusparseXcsrmm_wrapper(cusparseHandle, trans, m, k, n, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c, ldc);
+        cusparseStatus = cusparseXcsrmm_wrapper(cusparseHandle, trans, m, k, n, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c, ldc);
 #else
-    cusparseStatus = cusparseScsrmm(cusparseHandle, trans, m, n, k, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c, ldc);
+        cusparseStatus = cusparseScsrmm(cusparseHandle, trans, m, n, k, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c, ldc);
 #endif
+    }
+    else if (ccv==mxREAL && ccb==mxCOMPLEX)
+    {
+        const float alpha = 1.0;
+        const float beta = 0.0;
+        const float * const d_val = (float*)mxGPUGetDataReadOnly(val);
 
+        mxGPUArray* c_real = mxGPUCreateGPUArray(ndim, cdims, cid, mxREAL, MX_GPU_INITIALIZE_VALUES);
+        mxGPUArray* c_imag = mxGPUCreateGPUArray(ndim, cdims, cid, mxREAL, MX_GPU_INITIALIZE_VALUES);
+        if(!c_real || !c_imag) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed.");
+        float* d_c_real = (float*)mxGPUGetDataReadOnly(c_real);
+        float* d_c_imag = (float*)mxGPUGetDataReadOnly(c_imag);
+        
+        for(int i = 0; i<2; i++)
+        {
+            mxGPUArray const *b_tmp;
+            if(i==0) b_tmp = mxGPUCopyReal(b);
+            if(i==1) b_tmp = mxGPUCopyImag(b);
+            const float* const d_b = (float*)mxGPUGetDataReadOnly(b_tmp);
+
+#if CUDART_VERSION >= 11000
+            if(i==0) cusparseStatus = cusparseXcsrmm_wrapper(cusparseHandle, trans, m, k, n, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c_real, ldc);
+            if(i==1) cusparseStatus = cusparseXcsrmm_wrapper(cusparseHandle, trans, m, k, n, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c_imag, ldc);
+#else
+            if(i==0) cusparseStatus = cusparseScsrmm(cusparseHandle, trans, m, n, k, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c_real, ldc);
+            if(i==1) cusparseStatus = cusparseScsrmm(cusparseHandle, trans, m, n, k, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c_imag, ldc);
+#endif
+            mxGPUDestroyGPUArray(b_tmp);
+            if(cusparseStatus != CUSPARSE_STATUS_SUCCESS) mxShowCriticalErrorMessage("csrmm failed.");
+        }
+        c = mxGPUCreateComplexGPUArray(c_real,c_imag);
+        if (c==NULL) mxShowCriticalErrorMessage("mxGPUCreateComplexGPUArray failed.");
+        mxGPUDestroyGPUArray(c_real);
+        mxGPUDestroyGPUArray(c_imag);
+    }
+    else
+    {
+        const cuFloatComplex alpha = make_cuFloatComplex(1.0, 0.0);
+        const cuFloatComplex beta = make_cuFloatComplex(0.0, 0.0);
+        const cuFloatComplex * const d_val = (cuFloatComplex*)mxGPUGetDataReadOnly(val);
+        const cuFloatComplex * const d_b = (cuFloatComplex*)mxGPUGetDataReadOnly(b);
+
+        c = mxGPUCreateGPUArray(ndim, cdims, cid, ccc, MX_GPU_INITIALIZE_VALUES);
+        if (c==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
+        cuFloatComplex *d_c = (cuFloatComplex*)mxGPUGetData(c);
+
+#if CUDART_VERSION >= 11000
+        cusparseStatus = cusparseXcsrmm_wrapper(cusparseHandle, trans, m, k, n, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c, ldc);
+#else
+        cusparseStatus = cusparseScsrmm(cusparseHandle, trans, m, n, k, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c, ldc);
+#endif
+    }
+   
+ 	// Return result
     if (cusparseStatus == CUSPARSE_STATUS_SUCCESS)
     {
-    	// Return result
     	C = mxGPUCreateMxArrayOnGPU(c);
-
-    	// Make sure operations are finished before deleting
-    	//cudaDeviceSynchronize();
     }
 
     // Clean up
@@ -169,12 +223,6 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     mxGPUDestroyGPUArray(b);
     mxGPUDestroyGPUArray(c);
     mxFree(bdims);
-
-    // Failure
-    if (cusparseStatus != CUSPARSE_STATUS_SUCCESS)
-    {
-        mxShowCriticalErrorMessage("Operation cusparseScsrmm failed",cusparseStatus);
-    }
 
     return;
 }
