@@ -25,7 +25,6 @@ classdef gpuSparse
                           % 0 = CUSPARSE_OPERATION_NON_TRANSPOSE
                           % 1 = CUSPARSE_OPERATION_TRANSPOSE
                           % 2 = CUSPARSE_OPERATION_CONJUGATE_TRANSPOSE
-
     end
     
     %%
@@ -161,6 +160,9 @@ classdef gpuSparse
             if trans~=0 && trans~=1 && trans~=2
                 error('Property trans must be 0, 1 or 2.')
             end
+            if isreal(A) && trans==2
+                error('Real matrix trans flag must be 0 or 1');
+            end
             A.trans = trans;
         end
 
@@ -191,6 +193,7 @@ classdef gpuSparse
             if A.row(1) ~= 1; error(message); end
             if A.row(end) ~= numel(A.val)+1; error(message); end
             if A.trans~=0 && A.trans~=1 && A.trans~=2; error(message); end
+            if isreal(A) && A.trans==2; error(message); end
 
             % slow checks
             if numel(A.val) > 0
@@ -213,6 +216,7 @@ classdef gpuSparse
         function B = real(A);
             B = A;
             B.val = real(A.val);
+            if B.trans==2; B.trans = 1; end
             %B = drop_zeros(B);
         end
         
@@ -220,6 +224,7 @@ classdef gpuSparse
         function B = imag(A);
             B = A;
             B.val = imag(A.val);
+            if B.trans==2; B.trans = 1; end
             %B = drop_zeros(B);
         end
         
@@ -227,12 +232,14 @@ classdef gpuSparse
         function B = abs(A);
             B = A;
             B.val = abs(A.val);
+            if B.trans==2; B.trans = 1; end
         end
         
         % angle
         function B = angle(A);
             B = A;
             B.val = angle(A.val);
+            if B.trans==2; B.trans = 1; end
         end
         
         % conj
@@ -245,6 +252,7 @@ classdef gpuSparse
         function B = sign(A);
             B = A;
             B.val = sign(A.val);
+            if B.trans==2; B.trans = 1; end
         end
         
         % complex
@@ -265,6 +273,7 @@ classdef gpuSparse
             end
             B = A;
             B.val = single(A.val > tol);
+            if B.trans==2; B.trans = 1; end
             %B = drop_zeros(B);
         end
         
@@ -275,6 +284,7 @@ classdef gpuSparse
             end
             B = A;
             B.val = single(A.val < tol);
+            if B.trans==2; B.trans = 1; end
             %B = drop_zeros(B);
         end   
         
@@ -285,6 +295,7 @@ classdef gpuSparse
             end
             B = A;
             B.val = single(A.val == tol);
+            if B.trans==2; B.trans = 1; end
             %B = drop_zeros(B);
         end  
         
@@ -593,7 +604,7 @@ classdef gpuSparse
         function AT = ctranspose(A)
             AT = A; % lazy copy
             switch A.trans
-                case 0; if isreal(A); AT.trans = 1; else AT.trans = 2; end
+                case 0; if isreal(A); AT.trans = 1; else; AT.trans = 2; end
                 case 1; AT.trans = 0; if ~isreal(A); AT.val = conj(AT.val); end
                 case 2; AT.trans = 0;
             end
@@ -625,7 +636,7 @@ classdef gpuSparse
             end
         end
 
-        % gather: returns sparse matrix on CPU (gather(sparse(A)) is faster but memory intensive) 
+        % gather: returns sparse matrix on CPU - gather(sparse(A)) is faster but memory intensive 
         function A_sp = gather(A)
             [m n] = size(A);
             i = gather(csr2coo(A.row,A.nrows));
