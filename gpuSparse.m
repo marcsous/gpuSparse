@@ -38,10 +38,10 @@ classdef gpuSparse
                 row = []; col = []; val = [];
             end
 
-            % expect a matrix, return gpuSparse ("row" is the first argument)
+            % expecting a matrix, return gpuSparse ("row" is the first argument)
             if nargin==1
                 if isa(row,'gpuSparse'); A = row; return; end % return unchanged
-                if ~isnumeric(row); error('Cannot convert ''%s'' to gpuSparse.',class(row)); end
+                if ~isnumeric(row) && ~islogical(row); error('Cannot convert ''%s'' to gpuSparse.',class(row)); end
                 if ~ismatrix(row); error('Cannot convert ND array to gpuSparse.'); end
                 [nrows ncols] = size(row);
                 [row col val] = find(row);
@@ -61,7 +61,7 @@ classdef gpuSparse
             % validate argument types
             validateattributes(row,{'numeric','gpuArray'},{'integer'},'','row');
             validateattributes(col,{'numeric','gpuArray'},{'integer'},'','col');
-            validateattributes(val,{'numeric','gpuArray'},{},'','val');
+            validateattributes(val,{'numeric','gpuArray','logical'},{},'','val');
 
             % check vector lengths
             row = reshape(row,[],1);
@@ -103,8 +103,6 @@ classdef gpuSparse
             end
 
             % simple memory check - needs work
-            info = gpuDevice();
-            AvailableMemory = info.AvailableMemory / 1E9;
             if ~exist('nzmax','var')
                 nzmax = numel(val);
             else
@@ -114,6 +112,7 @@ classdef gpuSparse
             RequiredMemory = 4*double(A.nrows+1)/1E9;
             RequiredMemory = RequiredMemory+4*double(nzmax)/1E9;
             RequiredMemory = RequiredMemory+4*double(nzmax)/1E9;
+            AvailableMemory = getfield(gpuDevice(),'AvailableMemory') / 1E9;            
             if RequiredMemory > AvailableMemory
                 error('Not enough memory (%.1fGb required, %.1fGb available).',RequiredMemory,AvailableMemory);
             end
@@ -240,6 +239,7 @@ classdef gpuSparse
             B = A;
             B.val = angle(A.val);
             if B.trans==2; B.trans = 1; end
+            %B = drop_zeros(B);
         end
         
         % conj
@@ -537,7 +537,7 @@ classdef gpuSparse
                 y = A;
                 y.val = y.val .* x;
             else
-                error('Argument x has too many dimensions.')
+                error('Multiplication only supported for scalars.')
             end
         end
         
@@ -611,8 +611,13 @@ classdef gpuSparse
         end
 
         % remove zeros from sparse matrix
-        function A = drop_zeros(A)
-            nonzeros = (A.val ~= 0);
+        function A = drop_zeros(A,tol)
+            if nargin<2
+                tol = 0;
+            else
+                validateattributes(tol,{'numeric'},{'nonnegative','scalar'},'','tol');
+            end
+            nonzeros = abs(A.val) > tol;
             if ~all(nonzeros)
                 A.row = csr2coo(A.row,A.nrows);
                 A.row = A.row(nonzeros);
