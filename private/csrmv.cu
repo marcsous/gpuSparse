@@ -173,8 +173,8 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
             if(i==0) cusparseStatus = cusparseXcsrmv_wrapper(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y_real);
             if(i==1) cusparseStatus = cusparseXcsrmv_wrapper(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y_imag);
 #else
-            if(i==0) cusparseStatus = cusparseCcsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y_real);
-            if(i==1) cusparseStatus = cusparseCcsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y_imag);
+            if(i==0) cusparseStatus = cusparseScsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y_real);
+            if(i==1) cusparseStatus = cusparseScsrmv(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y_imag);
 #endif
             mxGPUDestroyGPUArray(x_tmp);
             if(cusparseStatus != CUSPARSE_STATUS_SUCCESS) mxShowCriticalErrorMessage("csrmv failed.");
