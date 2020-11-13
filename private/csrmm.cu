@@ -203,7 +203,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 #if CUDART_VERSION >= 11000
         cusparseStatus = cusparseXcsrmm_wrapper(cusparseHandle, trans, m, k, n, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c, ldc);
 #else
-        cusparseStatus = cusparseScsrmm(cusparseHandle, trans, m, n, k, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c, ldc);
+        cusparseStatus = cusparseCcsrmm(cusparseHandle, trans, m, n, k, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c, ldc);
 #endif
     }
    
