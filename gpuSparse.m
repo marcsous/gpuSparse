@@ -44,7 +44,7 @@ classdef gpuSparse
                 if ~isnumeric(row) && ~islogical(row); error('Cannot convert ''%s'' to gpuSparse.',class(row)); end
                 if ~ismatrix(row); error('Cannot convert ND array to gpuSparse.'); end
                 [nrows ncols] = size(row);
-                [row col val] = find(row);
+                [row col val] = find(row); % if sparse, could grab the CSR vectors directly but needs mex = hassle
             end
 
             % empty m x n matrix
@@ -122,15 +122,15 @@ classdef gpuSparse
             col = int32(col);
             val = single(val);
 
-            % sort row and col for COO to CSR conversion - attempt to recompile mex files if there's an error
+            % sort row and col for COO to CSR conversion
             try
                 [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
             catch ME
                 warning('%s Attempting to recompile mex files...',ME.message);
-                mex_all;
+                mex_all; % recompile and try again... cannot help if this fails
                 [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
             end
-            
+
             % convert from COO to CSR
             A.row = coo2csr(A.row,A.nrows);
 
