@@ -13,7 +13,7 @@ Uses int32 and single precision to save memory (Matlab sparse uses int64 and dou
 
 2. ```A = gpuSparse(rand(4))``` to trigger compilation of mex
 
-3. <b>Recommended:</b> since CUDA-11 the transpose-multiply is much faster
+3. <b>Recommended:</b> since CUDA-11 the transpose-multiply is <i>much</i> faster
 
 
 ## Timings
@@ -39,5 +39,5 @@ A'*y (gpuArray) : Elapsed time is 0.232057 seconds. <i>(CUDA 11)</i>
 A*x  (gpuSparse): Elapsed time is 0.068451 seconds.
 At*y (gpuSparse): Elapsed time is 0.063651 seconds.
 A'*y (gpuSparse): Elapsed time is 0.059236 seconds. <i>(CUDA 11)</i>
-<s>a'*y (gpuSparse): Elapsed time is 3.094271 seconds.</s>
+<s>A'*y (gpuSparse): Elapsed time is 3.094271 seconds.</s>
 </pre>
