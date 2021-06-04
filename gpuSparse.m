@@ -13,7 +13,7 @@ classdef gpuSparse
         
         nrows(1,1) int32 % number of rows
         ncols(1,1) int32 % number of columns
-        
+
     end
     
     properties (SetAccess = private, Hidden = true)
@@ -25,6 +25,7 @@ classdef gpuSparse
                           % 0 = CUSPARSE_OPERATION_NON_TRANSPOSE
                           % 1 = CUSPARSE_OPERATION_TRANSPOSE
                           % 2 = CUSPARSE_OPERATION_CONJUGATE_TRANSPOSE
+        
     end
     
     %%
@@ -123,6 +124,13 @@ classdef gpuSparse
             val = single(val);
 
             % sort row and col for COO to CSR conversion
+            %[B I] = sortrows([row col]);
+            %A.row = B(:,1);
+            %A.col = B(:,2);
+            %A.val = val(I);
+            %clear B I row col val 
+            
+            % CUDA version
             try
                 [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
             catch ME
@@ -132,7 +140,13 @@ classdef gpuSparse
             end
 
             % convert from COO to CSR
-            A.row = coo2csr(A.row,A.nrows);
+            try
+                A.row = coo2csr(A.row,A.nrows);
+            catch ME
+                warning('%s Attempting to recompile mex files...',ME.message);
+                mex_all; % recompile and try again... cannot help if this fails
+                A.row = coo2csr(A.row,A.nrows);
+            end
 
         end
         
@@ -646,19 +660,28 @@ classdef gpuSparse
             [m n] = size(A);
             i = gather(csr2coo(A.row,A.nrows));
             j = gather(A.col);
-            v = gather(double(A.val));
+            v = gather(double(A.val)); % double for sparse
             switch A.trans
-                % int32 indices ok (2020a)
+                % sparse int32 indices ok (2020a)
                 case 0; A_sp = sparse(i,j,v,m,n);
                 case 1; A_sp = sparse(j,i,v,m,n);
                 case 2; A_sp = sparse(j,i,conj(v),m,n);
             end
         end
         
-        % full: returns full matrix on GPU (not efficient, mainly for debugging)
+        % full: returns full matrix on CPU (not efficient, mainly for debugging)
         function A_f = full(A)
-            A_f = sparse(A);
-            A_f = cast(full(A_f),classUnderlying(A));
+            i = gather(csr2coo(A.row,A.nrows));
+            j = gather(A.col);
+            v = gather(A.val);
+            switch A.trans
+                % sparse int32 indices ok (2020a)
+                case 0; k = sub2ind(size(A),i,j);
+                case 1; k = sub2ind(size(A),j,i);
+                case 2; k = sub2ind(size(A),j,i); v = conj(v);
+            end
+            A_f = zeros(size(A),'like',v);
+            A_f(k) = v;
         end
 
         % numel - should it be 1 object or prod(size(A)) elements?
