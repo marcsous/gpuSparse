@@ -3,7 +3,9 @@ classdef gpuSparse
     % Sparse GPU array class (mex wrappers to cuSPARSE)
     % using int32 indices and single precision values.
     %
-    % Usage: A = gpuSparse(row,col,val,nrows,ncols,nzmax)    
+    % Usage: A = gpuSparse(row,col,val,nrows,ncols,nzmax)
+    %
+    % To recompile mex call gpuSparse('recompile')
     %
     % The nzmax argument can be used to check sufficient
     % memory: gpuSparse([],[],[],nrows,ncols,nzmax)
@@ -42,6 +44,7 @@ classdef gpuSparse
             % expecting a matrix, return gpuSparse ("row" is the first argument)
             if nargin==1
                 if isa(row,'gpuSparse'); A = row; return; end % return unchanged
+                if isequal(row,'recompile'); mex_all; return; end % recompile mex
                 if ~isnumeric(row) && ~islogical(row); error('Cannot convert ''%s'' to gpuSparse.',class(row)); end
                 if ~ismatrix(row); error('Cannot convert ND array to gpuSparse.'); end
                 [nrows ncols] = size(row);
@@ -123,30 +126,22 @@ classdef gpuSparse
             col = int32(col);
             val = single(val);
 
-            % sort row and col for COO to CSR conversion
+            % sort row and col for COO to CSR conversion (MATLAB)
             %[B I] = sortrows([row col]);
             %A.row = B(:,1);
             %A.col = B(:,2);
             %A.val = val(I);
             %clear B I row col val 
             
-            % CUDA version
+            % sort row and col for COO to CSR conversion (CUDA) (catch incompatible mex)
             try
                 [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
             catch ME
-                warning('%s Attempting to recompile mex files...',ME.message);
-                mex_all; % recompile and try again... cannot help if this fails
-                [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
+                error('%s Try gpuSparse(''recompile'') to recompile mex.',ME.message);
             end
 
             % convert from COO to CSR
-            try
-                A.row = coo2csr(A.row,A.nrows);
-            catch ME
-                warning('%s Attempting to recompile mex files...',ME.message);
-                mex_all; % recompile and try again... cannot help if this fails
-                A.row = coo2csr(A.row,A.nrows);
-            end
+            A.row = coo2csr(A.row,A.nrows);
 
         end
         
