@@ -13,7 +13,7 @@ Uses int32 and single precision to save memory (Matlab sparse uses int64 and dou
 
 2. ```A = gpuSparse('recompile')``` to trigger compilation of mex
 
-3. <b>Recommended:</b> since CUDA-11 the transpose-multiply is <i>much</i> faster
+3. <b>Recommended:</b> CUDA-11 for <i>much</i> faster transpose-multiply
 
 
 ## Timings
