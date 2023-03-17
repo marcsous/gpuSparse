@@ -5,6 +5,15 @@
 #include "mxShowCriticalErrorMessage.c"
 #include <iostream>
 
+// for cuda 12
+#if CUDART_VERSION >= 12000
+
+#define CUSPARSE_MV_ALG_DEFAULT CUSPARSE_SPMV_ALG_DEFAULT  
+#define CUSPARSE_CSR2CSC_ALG2 CUSPARSE_CSR2CSC_ALG1
+
+#endif
+// end of cuda 12
+
 #define CHECK_CUSPARSE(func)                                   \
 {                                                              \
     cusparseStatus_t status = (func);                          \

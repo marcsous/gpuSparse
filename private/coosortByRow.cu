@@ -150,15 +150,35 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     	// step 4: gather sorted cooVals
     	if (ccx == mxREAL)
     	{
-    	    const float * const d_val = (float*)mxGPUGetDataReadOnly(val);
+    	    float *d_val = (float*)mxGPUGetDataReadOnly(val);
     	    float *d_val_sort = (float*)mxGPUGetData(val_sort);
+#if CUDART_VERSION >= 11000
+            cusparseHandle_t handle = NULL;
+            cusparseDnVecDescr_t vec_values;          
+            cusparseSpVecDescr_t vec_permutation;
+            cusparseCreate(&handle);
+            cusparseCreateDnVec(&vec_values, nnz, d_val, CUDA_R_32F);
+            cusparseCreateSpVec(&vec_permutation, nnz, nnz, P, d_val_sort, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F); // MUST USE BASE_ZERO
+            cusparseStatus = cusparseGather(handle, vec_values, vec_permutation);
+#else
             cusparseStatus = cusparseSgthr(cusparseHandle, nnz, d_val, d_val_sort, P, CUSPARSE_INDEX_BASE_ZERO); // MUST USE BASE_ZERO
+#endif
         }
         else
         {
-    	    const cuFloatComplex * const d_val = (cuFloatComplex*)mxGPUGetDataReadOnly(val);
+    	    cuFloatComplex *d_val = (cuFloatComplex*)mxGPUGetDataReadOnly(val);
     	    cuFloatComplex *d_val_sort = (cuFloatComplex*)mxGPUGetData(val_sort);
+#if CUDART_VERSION >= 11000
+            cusparseHandle_t handle = NULL;
+            cusparseDnVecDescr_t vec_values;          
+            cusparseSpVecDescr_t vec_permutation;
+            cusparseCreate(&handle);
+            cusparseCreateDnVec(&vec_values, nnz, d_val, CUDA_C_32F);
+            cusparseCreateSpVec(&vec_permutation, nnz, nnz, P, d_val_sort, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_C_32F); // MUST USE BASE_ZERO
+            cusparseStatus = cusparseGather(handle, vec_values, vec_permutation);
+#else
             cusparseStatus = cusparseCgthr(cusparseHandle, nnz, d_val, d_val_sort, P, CUSPARSE_INDEX_BASE_ZERO); // MUST USE BASE_ZERO
+#endif
         }
     	if (cusparseStatus != CUSPARSE_STATUS_SUCCESS) mxShowCriticalErrorMessage("Operation cusparseSgthr or cusparseCgthr failed",cusparseStatus);
 

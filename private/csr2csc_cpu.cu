@@ -4,9 +4,9 @@
 // Inspired by:
 //    http://www.dgate.org/~brg/files/dis/smvm/frontend/matrix_io.c
 //
-
-void csr2csc(const int nrows, const int ncols, const int *row_csr, const int *col, const float *val_real, const float *val_imag,
-             int *row, int *col_csc, float *val_csc_real, float *val_csc_imag)
+template <class T> // template val_real to accept float or mxComplex for MX_HAS_INTERLEAVED_COMPLEX
+void csr2csc(const int nrows, const int ncols, const int *row_csr, const int *col, const T *val_real, const float *val_imag,
+             int *row, int *col_csc, T *val_csc_real, float *val_csc_imag)
 {
   int i, j, k, l;
 
@@ -90,21 +90,29 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     ROW = mxCreateUninitNumericArray(ndim, dims, mxINT32_CLASS, mxREAL);
     if (ROW==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
 
-    mxComplexity ccx = mxGetPi(VAL) ? mxCOMPLEX : mxREAL;
+    mxComplexity ccx = mxIsComplex(VAL) ? mxCOMPLEX : mxREAL;
     VAL_CSC = mxCreateUninitNumericArray(ndim, dims, mxSINGLE_CLASS, ccx);
     if (VAL_CSC==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed");
  
     // Pointers to the raw data
     const int * const row_csr = (int *)mxGetData(ROW_CSR);
     const int * const col = (int *)mxGetData(COL);
-    const float * const val_real = (float *)mxGetData(VAL);
-    const float * const val_imag = (float *)mxGetImagData(VAL);
-    	
+    void *val_real = mxGetData(VAL);
+#if MX_HAS_INTERLEAVED_COMPLEX
+    void *val_imag = NULL;
+#else
+    void *val_imag = mxGetImagData(VAL);
+#endif
+
     int *row = (int *)mxGetData(ROW);
     int *col_csc = (int *)mxGetData(COL_CSC);
-    float *val_csc_real = (float *)mxGetData(VAL_CSC);
-    float *val_csc_imag = (float *)mxGetImagData(VAL_CSC);
-    
+    void *val_csc_real = mxGetData(VAL_CSC);
+#if MX_HAS_INTERLEAVED_COMPLEX
+    void *val_csc_imag = NULL;
+#else    
+    void *val_csc_imag = mxGetImagData(VAL_CSC);
+#endif
+
     // Now we can access the arrays, we can do some checks
     const int base = row_csr[0];
     if (base != 1) mxShowCriticalErrorMessage("ROW_CSR not using 1-based indexing");
@@ -114,7 +122,15 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if (nnz_check != nnz) mxShowCriticalErrorMessage("ROW_CSR argument last element != nnz",nnz_check);
 
     // Convert from CSR to CSC
-    csr2csc(nrows, ncols, row_csr, col, val_real, val_imag, row, col_csc, val_csc_real, val_csc_imag);
+#if MX_HAS_INTERLEAVED_COMPLEX
+    if(ccx == mxCOMPLEX)
+        csr2csc(nrows, ncols, row_csr, col, (mxComplexSingle*)val_real, (float*)val_imag, row, col_csc, (mxComplexSingle*)val_csc_real, (float*)val_csc_imag);
+    else
+        csr2csc(nrows, ncols, row_csr, col, (float*)val_real, (float*)val_imag, row, col_csc, (float*)val_csc_real, (float*)val_csc_imag);
+#else
+    csr2csc(nrows, ncols, row_csr, col, (float*)val_real, (float*)val_imag, row, col_csc, (float*)val_csc_real, (float*)val_csc_imag);
+#endif
+
 
     return;
 }
