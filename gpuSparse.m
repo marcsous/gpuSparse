@@ -11,7 +11,7 @@ classdef gpuSparse
     % memory: gpuSparse([],[],[],nrows,ncols,nzmax)
     %
     %%
-    properties (SetAccess = immutable)
+    properties (SetAccess = private) %immutable)
         
         nrows(1,1) int32 % number of rows
         ncols(1,1) int32 % number of columns
@@ -126,14 +126,14 @@ classdef gpuSparse
             col = int32(col);
             val = single(val);
 
-            % sort row and col for COO to CSR conversion (MATLAB)
+            % sort row and col for COO to CSR conversion (MATLAB version)
             %[B I] = sortrows([row col]);
             %A.row = B(:,1);
             %A.col = B(:,2);
             %A.val = val(I);
             %clear B I row col val 
             
-            % sort row and col for COO to CSR conversion (CUDA) (catch incompatible mex)
+            % sort row and col for COO to CSR conversion (CUDA version)
             try
                 [A.row A.col A.val] = coosortByRow(row,col,val,A.nrows,A.ncols);
             catch ME
@@ -571,7 +571,7 @@ classdef gpuSparse
                 AT = gpuSparse([],[],[],n,m,nnz(A));
                 
                 if nnz(A) % cuSPARSE breaks if nnz==0 so avoid call
-                    if true % cuSPARSE version (uses excessive memory?)
+                    if 1 % older cuSPARSE used excessive memory - seems OK now
                         [AT.col AT.row AT.val] = csr2csc(A.row,A.col,A.val,m,n);
                     else % cpu version
                         row = gather(A.row);
