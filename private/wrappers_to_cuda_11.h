@@ -26,7 +26,7 @@ template<> cudaDataType type_to_enum<float>()           { return CUDA_R_32F; }
 template<> cudaDataType type_to_enum<cuComplex>()       { return CUDA_C_32F; }
 
 // -------------------------------------------------------------------------------//
-template<typename T>
+template<typename T, typename S>
 cusparseStatus_t
 cusparseXcsrmv_wrapper(cusparseHandle_t         handle,
                        cusparseOperation_t      transA,
@@ -35,7 +35,7 @@ cusparseXcsrmv_wrapper(cusparseHandle_t         handle,
                        int                      A_num_nnz,
                        const T*                 alpha,
                        const cusparseMatDescr_t descrA,
-                       const T*                 dA_values,
+                       const S*                 dA_values,
                        const int*               dA_csrOffsets,
                        const int*               dA_columns,
                        const T*                 dX,
@@ -46,7 +46,7 @@ cusparseXcsrmv_wrapper(cusparseHandle_t         handle,
     cusparseDnVecDescr_t vecX, vecY;
     void*        buffer     = NULL;
     size_t       bufferSize = 0;
-    cudaDataType typeA       = type_to_enum<T>();
+    cudaDataType typeA       = type_to_enum<S>();
     cudaDataType typeX       = type_to_enum<T>();
     cudaDataType typeY       = (typeA==CUDA_C_32F || typeX==CUDA_C_32F) ? CUDA_C_32F : CUDA_R_32F;
     

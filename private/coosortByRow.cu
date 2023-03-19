@@ -160,6 +160,9 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
             cusparseCreateDnVec(&vec_values, nnz, d_val, CUDA_R_32F);
             cusparseCreateSpVec(&vec_permutation, nnz, nnz, P, d_val_sort, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F); // MUST USE BASE_ZERO
             cusparseStatus = cusparseGather(handle, vec_values, vec_permutation);
+            cusparseDestroyDnVec(vec_values);
+            cusparseDestroySpVec(vec_permutation);
+            cusparseDestroy(handle);
 #else
             cusparseStatus = cusparseSgthr(cusparseHandle, nnz, d_val, d_val_sort, P, CUSPARSE_INDEX_BASE_ZERO); // MUST USE BASE_ZERO
 #endif
@@ -176,6 +179,9 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
             cusparseCreateDnVec(&vec_values, nnz, d_val, CUDA_C_32F);
             cusparseCreateSpVec(&vec_permutation, nnz, nnz, P, d_val_sort, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_C_32F); // MUST USE BASE_ZERO
             cusparseStatus = cusparseGather(handle, vec_values, vec_permutation);
+            cusparseDestroyDnVec(vec_values);
+            cusparseDestroySpVec(vec_permutation);
+            cusparseDestroy(handle);
 #else
             cusparseStatus = cusparseCgthr(cusparseHandle, nnz, d_val, d_val_sort, P, CUSPARSE_INDEX_BASE_ZERO); // MUST USE BASE_ZERO
 #endif

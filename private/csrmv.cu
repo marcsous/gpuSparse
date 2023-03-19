@@ -153,6 +153,16 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     }
     else if (ccv==mxREAL && ccx==mxCOMPLEX)
     {
+#if CUDART_VERSION >= 11200 // use 11.2 mixed real/complex operation
+        const cuFloatComplex alpha = make_cuFloatComplex(1.0, 0.0);
+        const cuFloatComplex beta = make_cuFloatComplex(0.0, 0.0);
+        y = mxGPUCreateGPUArray(ndim, dims, cid, ccy, MX_GPU_INITIALIZE_VALUES);
+        if (y==NULL) mxShowCriticalErrorMessage("mxGPUCreateGPUArray failed.");
+        cuFloatComplex* d_y = (cuFloatComplex*)mxGPUGetData(y);
+    	const float* const d_val = (float*)mxGPUGetDataReadOnly(val);
+    	const cuFloatComplex* const d_x = (cuFloatComplex*)mxGPUGetDataReadOnly(x);
+        cusparseStatus = cusparseXcsrmv_wrapper(cusparseHandle, trans, nrows, ncols, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_x, &beta, d_y);
+#else
         const float alpha = 1.0; 
         const float beta = 0.0;
         const float* const d_val = (float*)mxGPUGetDataReadOnly(val);
@@ -183,6 +193,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
         if (y==NULL) mxShowCriticalErrorMessage("mxGPUCreateComplexGPUArray failed.");
         mxGPUDestroyGPUArray(y_real);
         mxGPUDestroyGPUArray(y_imag);
+#endif
     }
     else
     {
