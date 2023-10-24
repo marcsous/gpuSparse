@@ -208,7 +208,7 @@ classdef gpuSparse
                 if min(A.col) < 1; error(message); end
                 if max(A.col) > A.ncols; error(message); end
                 rowcol = gather([csr2coo(A.row,A.nrows) A.col]);
-                %if ~issorted(rowcol,'rows'); error(message); end % this fails on CUDA 11 for transpose... but doesn't matter
+                if ~issorted(rowcol,'rows'); error(message); end
             end
             
         end
@@ -221,53 +221,46 @@ classdef gpuSparse
         end
         
         % real
-        function B = real(A);
-            B = A;
-            B.val = real(A.val);
-            if B.trans==2; B.trans = 1; end
-            %B = drop_zeros(B);
+        function A = real(A)
+            A.val = real(A.val);
+            if A.trans==2; A.trans = 1; end
+            A = drop_zeros(A);
         end
         
         % imag
-        function B = imag(A);
-            B = A;
-            B.val = imag(A.val);
-            if B.trans==2; B.trans = 1; end
-            %B = drop_zeros(B);
+        function A = imag(A)
+            A.val = imag(A.val);
+            if A.trans==2; A.trans = 1; end
+            A = drop_zeros(A);
         end
         
         % abs
-        function B = abs(A);
-            B = A;
-            B.val = abs(A.val);
-            if B.trans==2; B.trans = 1; end
+        function A = abs(A)
+            A.val = abs(A.val);
+            if A.trans==2; A.trans = 1; end
         end
         
         % angle
-        function B = angle(A);
-            B = A;
-            B.val = angle(A.val);
-            if B.trans==2; B.trans = 1; end
-            %B = drop_zeros(B);
+        function A = angle(A)
+            A.val = angle(A.val);
+            if A.trans==2; A.trans = 1; end
+            A = drop_zeros(A);
         end
         
         % conj
-        function B = conj(A);
-            B = A;
-            B.val = conj(A.val);
+        function A = conj(A)
+            A.val = conj(A.val);
         end
         
         % sign
-        function B = sign(A);
-            B = A;
-            B.val = sign(A.val);
-            if B.trans==2; B.trans = 1; end
+        function A = sign(A)
+            A.val = sign(A.val);
+            if A.trans==2; A.trans = 1; end
         end
         
         % complex
-        function B = complex(A);
-            B = A;
-            B.val = complex(A.val);
+        function A = complex(A)
+            A.val = complex(A.val);
         end
 
         % classUnderlying
@@ -276,36 +269,33 @@ classdef gpuSparse
         end
         
         % gt (only support scalar)
-        function B = gt(A,tol);
+        function A = gt(A,tol);
             if ~isscalar(tol)
                 error('Non-scalar argument not supported.');
             end
-            B = A;
-            B.val = single(A.val > tol);
-            if B.trans==2; B.trans = 1; end
-            %B = drop_zeros(B);
+            A.val = cast(A.val > tol,classUnderlying(A));
+            if A.trans==2; A.trans = 1; end
+            A = drop_zeros(A);
         end
         
         % lt (only support scalar)
-        function B = lt(A,tol);
+        function A = lt(A,tol);
             if ~isscalar(tol)
                 error('Non-scalar argument not supported.');
             end
-            B = A;
-            B.val = single(A.val < tol);
-            if B.trans==2; B.trans = 1; end
-            %B = drop_zeros(B);
+            A.val = cast(A.val < tol,classUnderlying(A));
+            if A.trans==2; A.trans = 1; end
+            A = drop_zeros(A);
         end   
         
         % eq (only support scalar)
-        function B = eq(A,tol);
+        function A = eq(A,tol);
             if ~isscalar(tol)
                 error('Non-scalar argument not supported.');
             end
-            B = A;
-            B.val = single(A.val == tol);
-            if B.trans==2; B.trans = 1; end
-            %B = drop_zeros(B);
+            A.val = cast(A.val == tol,classUnderlying(A));
+            if A.trans==2; A.trans = 1; end
+            A = drop_zeros(A);
         end  
         
         % nnz
@@ -323,22 +313,17 @@ classdef gpuSparse
             retval = numel(A.val);
         end
         
-        % mean
-        function retval = mean(A,DIM,varargin)
-            if nargin < 2; DIM = 1; end
-            if ~isequal(DIM,1) && ~isequal(DIM,2); error('Dimension value not supported.'); end
+        % mean: only A and DIM args are supported
+        function retval = mean(A,DIM)
+            if nargin==1; DIM = 1; end
             retval = sum(A,DIM) / size(A,DIM);
         end
         
         % nonzeros
         function val = nonzeros(A)
-            if A.trans==0
-                [~,~,val] = find(A);
-            else
-                val = nonzeros(A.val);
-                if A.trans==2
-                    val = conj(A.val);
-                end
+            val = nonzeros(A.val);
+            if A.trans==2
+                val = conj(val);
             end
         end
 
@@ -353,9 +338,11 @@ classdef gpuSparse
                 retval = sum(zeros(size(A)),DIM);
                 retval = gpuSparse(retval);
             else
-                if DIM==1; retval =(A'* ones(size(A,1),1,'single','gpuArray'))'; end
-                if DIM==2; retval = A * ones(size(A,2),1,'single','gpuArray'); end
-                if DIM>2; retval = A; end
+                switch DIM
+                    case 1; retval =(A'* ones(size(A,1),1,'like',A.val))';
+                    case 2; retval = A * ones(size(A,2),1,'like',A.val);
+                    otherwise; retval = A;
+                end
             end
         end
         
@@ -366,7 +353,7 @@ classdef gpuSparse
                 retval = norm(A.val,p);
             else
                 if isequal(p,2)
-                    error('gpuSparse norm(A,2) is not available.');
+                    error('gpuSparse norm(A,2) is not supported.');
                 elseif isequal(p,1)
                     retval = max(sum(abs(A),1));
                 elseif isequal(p,Inf)
@@ -374,7 +361,7 @@ classdef gpuSparse
                 elseif isequal(p,'fro');
                     retval = norm(A.val);
                 else
-                    error('The only matrix norms available are 1, 2, inf, and ''fro''.');
+                    error('The only matrix norms supported are 1, 2, inf, and ''fro''.');
                 end
             end
         end
@@ -488,9 +475,8 @@ classdef gpuSparse
         
         % csrgeam: C = a*A + b*B
         function C = geam(A,B,a,b)
-            if ~isequal(class(A),class(B))
-                error('No method for adding %s and %s.',class(A),class(B))
-            end
+            A = gpuSparse(A);
+            B = gpuSparse(B);
             if ~isequal(size(A),size(B))
                 error('Matrices must be the same size.')
             end
@@ -512,11 +498,12 @@ classdef gpuSparse
             [C.row C.col C.val] = csrgeam(A.row,A.col,A.val,m,n,B.row,B.col,B.val,a,b);
         end
         
-        % mtimes: A * x
+        % mtimes: A*x (or x*A for scalar x)
         function y = mtimes(A,x)
-            if isempty(x)
-                error('Argument x is empty.')
-            elseif ~isnumeric(x) && ~islogical(x)
+            if isa(x,'gpuSparse') && ~isa(A,'gpuSparse')
+                [A x] = deal(x,A);
+            end
+            if ~isnumeric(x) && islogical(x)
                 error('Argument x must be numeric (%s not supported).',class(x))
             elseif isscalar(x) && ~iscolumn(A)
                 y = A;
@@ -536,26 +523,39 @@ classdef gpuSparse
             end
         end
         
-        % times: A .* x
-        function y = times(A,x)
-            if isempty(x)
-                error('Argument x is empty.')
-            elseif ~isnumeric(x) && ~islogical(x)
+        % times: A.*x or x.*A (scalar x only)
+        function A = times(A,x)
+            if isa(x,'gpuSparse') && ~isa(A,'gpuSparse')
+                [A x] = deal(x,A);
+            end
+            if ~isnumeric(x) && ~islogical(x) && ~isempty(x)
                 error('Argument x must be numeric (%s not supported).',class(x))
-            elseif isscalar(x)
-                y = A;
-                y.val = y.val .* x;
+            elseif isscalar(x) && isfinite(x)
+                A.val = A.val .* x;
             else
-                error('Multiplication only supported for scalars.')
+                error('Multiplication only supported for finite scalars.')
             end
         end
         
-        % divide: A ./ x
-        function y = rdivide(A,x)
-            if ~isa(A,'gpuSparse')
+        % divide: A./x
+        function A = rdivide(A,x)
+            if isa(x,'gpuSparse')
                 error('Division by gpuSparse array not supported.');
             end
-            y = times(A,1./x);
+            A = times(A,1./x);
+        end
+        
+        % divide: A/x (scalar x only)
+        function A = mrdivide(A,x)
+            A = A./x;
+        end
+        
+        % power: A.^x
+        function A = power(A,x)
+            if isa(x,'gpuSparse') || ~isscalar(x)
+                error('Power A.^x only supported for gpuSparse A and scalar x.');
+            end
+            A.val = A.val.^x;
         end
         
         % full transpose: A.'
@@ -622,17 +622,17 @@ classdef gpuSparse
         % remove zeros from sparse matrix
         function A = drop_zeros(A,tol)
             if nargin<2
-                tol = 0;
+                nz = (A.val ~= 0);
             else
                 validateattributes(tol,{'numeric'},{'nonnegative','scalar'},'','tol');
+                nz = abs(A.val) < tol;
             end
-            nonzeros = abs(A.val) > tol;
-            if ~all(nonzeros)
+            if any(nz)
                 A.row = csr2coo(A.row,A.nrows);
-                A.row = A.row(nonzeros);
+                A.row = A.row(nz);
                 A.row = coo2csr(A.row,A.nrows);
-                A.col = A.col(nonzeros);
-                A.val = A.val(nonzeros);
+                A.col = A.col(nz);
+                A.val = A.val(nz);
             end
         end
         
@@ -684,6 +684,49 @@ classdef gpuSparse
             retval = prod(size(A));
         end
 
+        % cat
+        function C = cat(dim,A,B)
+            switch dim
+                case 1; C = vertcat(A,B);
+                case 2; C = horzcat(A,B);
+                otherwise; error('Concatenation only supported for dim=1 or 2.');
+            end
+        end
+
+        % vertcat
+        function C = vertcat(A,B)
+            if ~isa(B,'gpuSparse')
+                error('Concatenation only supported for gpuSparse.');
+            end
+            if A.trans || B.trans
+                error('Concatenation not supported with transpose.');
+            end
+            if size(A,2)~=size(B,2)
+                error('Concatenation requires number of cols be equal.');
+            end
+            C = gpuSparse(size(A,1)+size(B,1),size(A,2));
+            C.row = [A.row;B.row(2:end)+numel(A.val)];
+            C.col = [A.col;B.col];
+            C.val = [A.val;B.val];
+        end
+
+        % horzcat - possible to avoid csr2coo calls?
+        function C = horzcat(A,B)
+            if ~isa(B,'gpuSparse') || A.trans || B.trans
+                error('Concatenation only supported for non-tranposed gpuSparse.');
+            end
+            if A.trans || B.trans
+                error('Concatenation not supported with transpose.');
+            end
+            if size(A,1)~=size(B,1)
+                error('Concatenation requires number of rows be equal.');
+            end
+            i = [csr2coo(A.row,A.nrows);csr2coo(B.row,B.nrows)];
+            j = [A.col;B.col+size(A,2)];
+            v = [A.val;B.val];
+            C = gpuSparse(i,j,v,size(A,1),size(A,2)+size(B,2));
+        end
+
         % Mathworks suggested this to help fix . indexing
         function retval = numArgumentsFromSubscript(A, s, ic)
             retval = builtin('numArgumentsFromSubscript', A, s, ic);
@@ -700,15 +743,8 @@ classdef gpuSparse
         function retval = subsasgn(A,s,b)
             error('subsasgn not implemented.');
         end
-        function varargout = cat(varargin)
-            error('cat not implemented.');
+        function A = reshape(A,m,n)
+            error('reshape not implemented.');
         end
-        function varargout = horzcat(varargin)
-            error('horzcat not implemented.');
-        end
-        function varargout = vertcat(varargin)
-            error('vertcat not implemented.');
-        end
-        
     end
 end
