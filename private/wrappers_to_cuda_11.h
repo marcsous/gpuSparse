@@ -14,11 +14,11 @@
 #endif
 // end of cuda 12
 
-#define CHECK_CUSPARSE(func)                                   \
-{                                                              \
-    cusparseStatus_t status = (func);                          \
-    if (status != CUSPARSE_STATUS_SUCCESS)                     \
-        mxShowCriticalErrorMessage("cusparseStatus_t",status); \
+#define CHECK_CUSPARSE(func)                                               \
+{                                                                          \
+    cusparseStatus_t status = (func);                                      \
+    if (status != CUSPARSE_STATUS_SUCCESS)                                 \
+        mxShowCriticalErrorMessage(cusparseGetErrorString(status),status); \
 }
 
 template<typename T> cudaDataType type_to_enum();
@@ -102,10 +102,10 @@ cusparseXcsrmm_wrapper(cusparseHandle_t         handle,
                        int                      A_num_nnz,
                        const T*                 alpha,
                        const cusparseMatDescr_t descrA,
-                       const T*                 dA_values,
+                       const S*                 dA_values,
                        const int*               dA_csrOffsets,
                        const int*               dA_columns,
-                       const S*                 dB,
+                       const T*                 dB,
                        int                      ldb,
                        const T*                 beta,
                        void*                    dC,
@@ -115,8 +115,8 @@ cusparseXcsrmm_wrapper(cusparseHandle_t         handle,
     cusparseDnMatDescr_t matB, matC;
     void*        buffer     = NULL;
     size_t       bufferSize = 0;
-    cudaDataType typeA      = type_to_enum<T>();
-    cudaDataType typeB      = type_to_enum<S>();  
+    cudaDataType typeA      = type_to_enum<S>();
+    cudaDataType typeB      = type_to_enum<T>();  
     cudaDataType typeC      = (typeA==CUDA_C_32F || typeB==CUDA_C_32F) ? CUDA_C_32F : CUDA_R_32F;
 
     // handle some limited transpose functionality (A or A' only)
@@ -130,9 +130,9 @@ cusparseXcsrmm_wrapper(cusparseHandle_t         handle,
                                       (void*)dA_csrOffsets, (void*)dA_columns, (void*)dA_values,
                                       CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
                                       cusparseGetMatIndexBase(descrA), typeA) )
-    // Create dense vector X
+    // Create dense vector B
     CHECK_CUSPARSE( cusparseCreateDnMat(&matB, B_num_rows, B_num_cols, ldb, (void*)dB, typeB, CUSPARSE_ORDER_COL) )
-    // Create dense vector y
+    // Create dense vector C
     CHECK_CUSPARSE( cusparseCreateDnMat(&matC, C_num_rows, C_num_cols, ldc, (void*)dC, typeC, CUSPARSE_ORDER_COL) )
     // allocate an external buffer if needed
     CHECK_CUSPARSE( cusparseSpMM_bufferSize(

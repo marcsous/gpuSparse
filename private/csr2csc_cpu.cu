@@ -45,8 +45,8 @@ void csr2csc(const int nrows, const int ncols, const int *row_csr, const int *co
 
 // MATLAB related
 #include "mex.h"
-#include "mxShowCriticalErrorMessage.c"
-
+#include "mxShowCriticalErrorMessage.c"      
+        
 // Input Arguments
 #define	ROW_CSR prhs[0] // CSR format
 #define	COL     prhs[1]
