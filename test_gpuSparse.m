@@ -223,10 +223,11 @@ fprintf('   %i %i %g\n',norm(i-i2),norm(j-j2),norm(single(v)-v2))
 [i j v] = find(A.'); [i2 j2 v2] = find(a.');
 fprintf('   %i %i %g\n',norm(i-i2),norm(j-j2),norm(single(v)-v2))
 
-disp('nonzeros')
-disp(norm(nonzeros(A)-nonzeros(a),inf)) % expected failure - different order
-disp(norm(nonzeros(A')-nonzeros(a'),inf))
-disp(norm(nonzeros(A.')-nonzeros(a.'),inf))
+% these fail - values are in different order
+%disp('nonzeros')
+%disp(norm(nonzeros(A)-nonzeros(a),inf))
+%disp(norm(nonzeros(A')-nonzeros(a'),inf))
+%disp(norm(nonzeros(A.')-nonzeros(a.'),inf))
 
 disp('addition')
 B = sprandn(M,N,P);
@@ -271,8 +272,8 @@ for j = 1:2
     if j==1
         fprintf('\n============= Matrix-vector multiply =============\n');
     else
-        x = repmat(x,1,2);
-        y = repmat(y,1,2);
+        x = repmat(x,1,5);
+        y = repmat(y,1,5);
         fprintf('\n========= Matrix-matrix multiply (cols %i) =========\n',size(x,2));
     end
     
@@ -318,6 +319,7 @@ for j = 1:2
     end
     toc;
     
+    a = gpuSparse(A); validate(a)
     x = single(x);
     y = single(y);
     
