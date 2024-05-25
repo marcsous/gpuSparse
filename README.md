@@ -15,6 +15,7 @@ Uses int32 and single precision to save memory (Matlab sparse uses int64 and dou
 
 3. <b>Recommended:</b> CUDA-11 for <i>much</i> faster transpose-multiply
 
+4. Check CUDART_VERSION is correct: ```grep CUDART_VERSION /usr/local/cuda/include/cuda_runtime_api.h```
 
 ## Timings
 <pre>
