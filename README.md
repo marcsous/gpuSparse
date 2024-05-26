@@ -15,8 +15,6 @@ Uses int32 and single precision to save memory (Matlab sparse uses int64 and dou
 
 3. <b>Recommended:</b> CUDA-11 for <i>much</i> faster transpose-multiply
 
-4. Check CUDART_VERSION is correct: ```grep CUDART_VERSION /usr/local/cuda/include/cuda_runtime_api.h```
-
 ## Timings
 <pre>
 <b>Due to memory layout (row/col-major) multiply and transpose-multiply differ in performance.</b>
@@ -38,7 +36,7 @@ A'*y (gpuArray) : Elapsed time is 0.232057 seconds. <i>(CUDA 11)</i>
 
 <b>GPU gpuSparse</b>
 A*x  (gpuSparse): Elapsed time is 0.068451 seconds.
-At*y (gpuSparse): Elapsed time is 0.063651 seconds.
+AT*y (gpuSparse): Elapsed time is 0.063651 seconds.
 A'*y (gpuSparse): Elapsed time is 0.059236 seconds. <i>(CUDA 11)</i>
 <s>A'*y (gpuSparse): Elapsed time is 3.094271 seconds.</s>
 </pre>
