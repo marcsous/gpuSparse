@@ -153,7 +153,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     }
     else if (ccv==mxREAL && ccx==mxCOMPLEX)
     {
-#if CUDART_VERSION >= 11200 // use 11.2 mixed real/complex operation
+#if CUDART_VERSION >= 11020 // use 11.2 mixed real/complex operation
         const cuFloatComplex alpha = make_cuFloatComplex(1.0, 0.0);
         const cuFloatComplex beta = make_cuFloatComplex(0.0, 0.0);
         y = mxGPUCreateGPUArray(ndim, dims, cid, ccy, MX_GPU_INITIALIZE_VALUES);
