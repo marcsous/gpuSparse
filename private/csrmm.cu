@@ -35,7 +35,7 @@
 #define	B       prhs[6] // dense matrix
 
 // Output Arguments
-#define	C	plhs[0] // C = op(A) * B (sparse A, dense B)
+#define	C	plhs[0] // C = alpha * op(A) * B + beta * C (sparse A, dense B)
 
 void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
 {
@@ -94,10 +94,10 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if (mxGPUGetClassID(b) != mxSINGLE_CLASS) mxShowCriticalErrorMessage("B argument is not single");
 
     // Check real/complex - mixed is not supported except special case (real A / complex B)
-    mxComplexity ccb = mxGPUGetComplexity(b);          
-    mxComplexity ccv = mxGPUGetComplexity(val);
-    mxComplexity ccc = (ccb==mxCOMPLEX || ccv==mxCOMPLEX) ? mxCOMPLEX : mxREAL;
-    if(ccb==mxREAL && ccv==mxCOMPLEX) mxShowCriticalErrorMessage("Complex matrix and real vector not supported");
+    mxComplexity cca = mxGPUGetComplexity(val);
+    mxComplexity ccb = mxGPUGetComplexity(b);
+    mxComplexity ccc = (ccb==mxCOMPLEX || cca==mxCOMPLEX) ? mxCOMPLEX : mxREAL;
+    if(ccb==mxREAL && cca==mxCOMPLEX) mxShowCriticalErrorMessage("Complex matrix and real vector not supported");
 
     // Create space for output vectors
     const mwSize ndim = 2;
@@ -138,7 +138,7 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
     if (nnz_check != nnz) mxShowCriticalErrorMessage("ROW_CSR argument last element != nnz",nnz_check);
 
     // Call cusparse multiply function in (S)ingle precision
-    if (ccv==mxREAL && ccb==mxREAL)
+    if (cca==mxREAL && ccb==mxREAL)
     {
         const float alpha = 1.0;
         const float beta = 0.0;
@@ -155,9 +155,9 @@ void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
         cusparseStatus = cusparseScsrmm(cusparseHandle, trans, m, n, k, nnz, &alpha, descr, d_val, d_row_csr, d_col, d_b, ldb, &beta, d_c, ldc);
 #endif
     }
-    else if (ccv==mxREAL && ccb==mxCOMPLEX)
+    else if (cca==mxREAL && ccb==mxCOMPLEX)
     {
-#if CUDART_VERSION >= 12040 // use 12.4 mixed real/complex operation 
+#if 0 // CUDART_VERSION >= 12040 // use 12.4 mixed real/complex operation 
         const cuFloatComplex alpha = make_cuFloatComplex(1.0, 0.0);
         const cuFloatComplex beta = make_cuFloatComplex(0.0, 0.0);
         c = mxGPUCreateGPUArray(ndim, cdims, cid, ccc, MX_GPU_INITIALIZE_VALUES);

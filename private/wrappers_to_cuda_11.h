@@ -137,7 +137,7 @@ cusparseXcsrmm_wrapper(cusparseHandle_t         handle,
     // allocate an external buffer if needed
     CHECK_CUSPARSE( cusparseSpMM_bufferSize(
                                  handle, transA, transB,
-                                 alpha, matA, matB, beta, matC, typeC,
+                                 (void*)alpha, matA, matB, (void*)beta, matC, typeC,
                                  CUSPARSE_SPMM_ALG_DEFAULT, &bufferSize) )
     if (bufferSize > 0)  {
         cudaError_t status = cudaMalloc(&buffer, bufferSize);
