@@ -26,7 +26,7 @@ end
 %% call mexcuda
 function mex_all_compile()
 
-mexcuda csrgeam.cu      -R2018a -I/usr/local/cuda/include -L/usr/local/cuda/lib64 NVCCFLAGS='"$NVCCFLAGS -w -Wno-deprecated-gpu-targets"' LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas -lculibos -dynamic -v
+mexcuda csrgeam.cu       -I/usr/local/cuda/include -L/usr/local/cuda/lib64 NVCCFLAGS='"$NVCCFLAGS -w -Wno-deprecated-gpu-targets"' LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas -lculibos -dynamic -v
 mexcuda csrmv.cu        -R2018a -I/usr/local/cuda/include -L/usr/local/cuda/lib64 NVCCFLAGS='"$NVCCFLAGS -w -Wno-deprecated-gpu-targets"' LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas -lculibos -dynamic
 mexcuda coo2csr.cu      -R2018a -I/usr/local/cuda/include -L/usr/local/cuda/lib64 NVCCFLAGS='"$NVCCFLAGS -w -Wno-deprecated-gpu-targets"' LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas -lculibos -dynamic
 mexcuda csr2csc.cu      -R2018a -I/usr/local/cuda/include -L/usr/local/cuda/lib64 NVCCFLAGS='"$NVCCFLAGS -w -Wno-deprecated-gpu-targets"' LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas -lculibos -dynamic

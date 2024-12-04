@@ -19,7 +19,7 @@
 // MATLAB related
 #include "mex.h"
 #include "gpu/mxGPUArray.h"
-#include "mxShowCriticalErrorMessage.c"
+#include "mxShowCriticalErrorMessage.h"
 
 // Input Arguments
 #define	ROW_CSR prhs[0]

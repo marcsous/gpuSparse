@@ -2,7 +2,7 @@
 
 #include <cuda_runtime.h> 
 #include <cusparse.h> 
-#include "mxShowCriticalErrorMessage.c"
+#include "mxShowCriticalErrorMessage.h"
 #include <iostream>
 
 // for cuda 12
