@@ -625,7 +625,7 @@ classdef gpuSparse
                 nz = (A.val ~= 0);
             else
                 validateattributes(tol,{'numeric'},{'nonnegative','scalar'},'','tol');
-                nz = abs(A.val) < tol;
+                nz = abs(A.val) > tol;
             end
             if any(nz)
                 A.row = csr2coo(A.row,A.nrows);
