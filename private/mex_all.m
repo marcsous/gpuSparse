@@ -16,7 +16,7 @@ cd(newpath);
 
 % if the mexcuda fails, we are stuck - rethrow error
 try
-    mex_all_compile();
+    mex_all_compile(); % see below in case of unsuppored gpu errors
     cd(oldpath)
 catch ME
     cd(oldpath)
@@ -26,7 +26,23 @@ end
 %% call mexcuda
 function mex_all_compile()
 
-mexcuda csrgeam.cu       -I/usr/local/cuda/include -L/usr/local/cuda/lib64 NVCCFLAGS='"$NVCCFLAGS -w -Wno-deprecated-gpu-targets"' LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas -lculibos -dynamic -v
+% Note: if you run into errors like this:
+%
+%   nvcc fatal   : Unsupported gpu architecture 'compute_35':
+%
+% then
+%
+%   sudo vi /usr/local/MATLAB/R2023a/toolbox/parallel/gpu/extern/src/mex/glnxa64/nvcc_g++_dynamic.xml
+%
+% and remove -gencode=arch=compute_35,code=sm_35 from NVCCFLAGS, e.g.
+%
+%   NVCCFLAGS="-gencode=arch=compute_35,code=sm_35 -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_60,code=sm_60...
+%
+%   NVCCFLAGS="-gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_60,code=sm_60...
+%
+% Then it should compile.
+
+mexcuda csrgeam.cu      -R2018a -I/usr/local/cuda/include -L/usr/local/cuda/lib64 NVCCFLAGS='"$NVCCFLAGS -w -Wno-deprecated-gpu-targets"' LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas -lculibos -dynamic -v
 mexcuda csrmv.cu        -R2018a -I/usr/local/cuda/include -L/usr/local/cuda/lib64 NVCCFLAGS='"$NVCCFLAGS -w -Wno-deprecated-gpu-targets"' LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas -lculibos -dynamic
 mexcuda coo2csr.cu      -R2018a -I/usr/local/cuda/include -L/usr/local/cuda/lib64 NVCCFLAGS='"$NVCCFLAGS -w -Wno-deprecated-gpu-targets"' LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas -lculibos -dynamic
 mexcuda csr2csc.cu      -R2018a -I/usr/local/cuda/include -L/usr/local/cuda/lib64 NVCCFLAGS='"$NVCCFLAGS -w -Wno-deprecated-gpu-targets"' LDFLAGS='"$LDFLAGS -Wl,--no-as-needed"' -ldl -lcusparse -lcublas -lculibos -dynamic
